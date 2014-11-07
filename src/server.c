@@ -33,7 +33,8 @@ int http_server_setopt(http_server * srv, http_server_option opt, ...)
 {
     va_list ap;
     va_start(ap, opt);
-    if (opt >= HTTP_SERVER_POINTER_POINT)
+    fprintf(stderr, "setopt: %d\n", opt);
+    if (opt >= HTTP_SERVER_POINTER_POINT && opt < HTTP_SERVER_FUNCTION_POINT)
     {
         void * ptr = va_arg(ap, void*);
         if (opt == HTTP_SERVER_OPT_OPEN_SOCKET_DATA)
@@ -41,15 +42,18 @@ int http_server_setopt(http_server * srv, http_server_option opt, ...)
             srv->opensocket_data = ptr;
             fprintf(stderr, "set opensocket data %p\n", ptr);
         }
+        goto success;
     }
-    else if (opt >= HTTP_SERVER_FUNCTION_POINT)
+    if (opt >= HTTP_SERVER_FUNCTION_POINT)
     {
         if (opt == HTTP_SERVER_OPT_OPEN_SOCKET_FUNCTION)
         {
             srv->opensocket_func = va_arg(ap, http_server_opensocket_callback);
             fprintf(stderr, "set opensocket func\n");
         }
+        goto success;
     }
+success:
     va_end(ap);
     return HTTP_SERVER_OK;
 }

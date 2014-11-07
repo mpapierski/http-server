@@ -30,13 +30,13 @@ typedef enum {
  * purpse. It could be UDP or TCP (or some abstract type)
  * @param clientp User defined pointer
  */
-typedef int (*http_server_opensocket_callback)(void * clientp);
+typedef http_server_socket_t (*http_server_opensocket_callback)(void * clientp);
 
 typedef struct {
     /**
      * Socket listener. This is the socket that listens for connections.
      */
-    int sock_listen;
+    http_server_socket_t sock_listen;
     http_server_opensocket_callback opensocket_func;
     void * opensocket_data;
 } http_server;

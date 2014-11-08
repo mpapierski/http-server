@@ -109,6 +109,11 @@ int http_server_setopt(http_server * srv, http_server_option opt, ...);
  * Starts http server. Assumes all options are configured. This will
  * create sockets.
  */
+int http_server_start(http_server * srv);
+
+/**
+ * Blocks and serves connections
+ */
 int http_server_run(http_server * srv);
 
 /**

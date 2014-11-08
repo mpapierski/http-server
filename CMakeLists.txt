@@ -2,6 +2,7 @@ cmake_minimum_required (VERSION 2.6)
 project (http_server C)
 
 option (HTTP_SERVER_TESTS "Build http-server tests" OFF)
+option (HTTP_SERVER_EXAMPLES "Build http-server examples" OFF)
 
 include_directories (
     include/)
@@ -12,3 +13,7 @@ if (HTTP_SERVER_TESTS)
     enable_testing ()
     add_subdirectory (tests)
 endif (HTTP_SERVER_TESTS)
+
+if (HTTP_SERVER_EXAMPLES)
+	add_subdirectory (examples)
+endif ()

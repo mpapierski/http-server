@@ -7,7 +7,7 @@ static int _default_opensocket_function(void * clientp)
 {
     int s;
     // create default ipv4 socket for listener
-    if ((s = socket(PF_INET, SOCK_STREAM, 0)) == -1)
+    if ((s = socket(AF_INET, SOCK_STREAM, 0)) == -1)
     {
         return HTTP_SERVER_INVALID_SOCKET;
     }
@@ -18,6 +18,7 @@ int http_server_init(http_server * srv)
 {
     srv->opensocket_func = &_default_opensocket_function;
     srv->opensocket_data = srv;
+    srv->sock_listen = HTTP_SERVER_INVALID_SOCKET;
     return HTTP_SERVER_OK;
 }
 
@@ -55,5 +56,12 @@ int http_server_setopt(http_server * srv, http_server_option opt, ...)
     }
 success:
     va_end(ap);
+    return HTTP_SERVER_OK;
+}
+
+int http_server_run(http_server * srv)
+{
+    // Create listening socket
+    srv->sock_listen = srv->opensocket_func(srv->opensocket_data);
     return HTTP_SERVER_OK;
 }

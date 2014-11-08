@@ -64,6 +64,6 @@ int http_server_setopt(http_server * srv, http_server_option opt, ...);
 /**
  * Runs http server. Assumes all options are configured
  */
-void http_server_run(http_server * srv);
+int http_server_run(http_server * srv);
 
 #endif

@@ -31,6 +31,14 @@ void test_setopt()
     ok(srv.opensocket_func == &_opensocket_function, "setopt (open socket function) is correct");
 }
 
+void test_run()
+{
+    int r;
+    r = http_server_run(&srv);
+    cmp_ok(r, "==", HTTP_SERVER_OK);
+    cmp_ok(srv.sock_listen, "!=", HTTP_SERVER_INVALID_SOCKET);
+}
+
 void test_cleanup()
 {
     http_server_free(&srv);
@@ -41,6 +49,7 @@ int main(int argc, char * argv[])
     test_init();
     test_setopt();
     test_cleanup();
+    test_run();
     done_testing();
     return 0;
 }

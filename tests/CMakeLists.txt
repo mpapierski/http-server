@@ -11,3 +11,11 @@ target_link_libraries (test_http_server
     tap)
 add_test (http_server
     test_http_server)
+
+add_executable (test_errors
+    test_errors.c)
+target_link_libraries (test_errors
+    http_server
+    tap)
+add_test (errors
+    test_errors)

@@ -1,2 +1,3 @@
 add_library (http_server
-	server.c)
+    server.c
+    errors.c)

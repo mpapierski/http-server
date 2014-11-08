@@ -94,6 +94,13 @@ int http_server_init(http_server * srv);
 void http_server_free(http_server * srv);
 
 /**
+ * String description of error.
+ * @param e Error code
+ * @return Description as string
+ */
+char * http_server_errstr(http_server_errno e);
+
+/**
  * Sets options for http_server instance
  */
 int http_server_setopt(http_server * srv, http_server_option opt, ...);

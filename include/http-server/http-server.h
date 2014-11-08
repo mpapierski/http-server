@@ -94,6 +94,7 @@ typedef enum {
     HTTP_SERVER_NOTIMPL, // Not implemented error
     HTTP_SERVER_SOCKET_EXISTS, // Socket is already managed
     HTTP_SERVER_INVALID_PARAM, // Invalid parameter
+    HTTP_SERVER_CLIENT_EOF, // End of file
 } http_server_errno;
 
 // Poll for reading
@@ -154,5 +155,13 @@ int http_server_add_client(http_server * srv, http_server_socket_t sock);
  * @param sock Socket
  */
 int http_server_pop_client(http_server * srv, http_server_socket_t sock);
+
+/**
+ * Perform action on a socket. Usually called after receiving some async event.
+ * @param srv Server instance
+ * @param socket Socket object
+ * @param flags Flags (mix of flags: HTTP_SERVER_POLL_IN|HTTP_SERVER_POLL_OUT)
+ */
+int http_server_socket_action(http_server * srv, http_server_socket_t socket, int flags);
 
 #endif

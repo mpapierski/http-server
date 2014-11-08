@@ -15,6 +15,8 @@ char * http_server_errstr(http_server_errno e)
         return "Socket is already managed";
     case HTTP_SERVER_INVALID_PARAM:
         return "Invalid parameter";
+    case HTTP_SERVER_CLIENT_EOF:
+        return "End of file";
     default:
         // Invalid error code
         return 0;

@@ -9,6 +9,7 @@ int main(int argc, char * argv[])
     is(http_server_errstr(HTTP_SERVER_NOTIMPL), "Not implemented error");
     is(http_server_errstr(HTTP_SERVER_SOCKET_EXISTS), "Socket is already managed");
     is(http_server_errstr(HTTP_SERVER_INVALID_PARAM), "Invalid parameter");
+    is(http_server_errstr(HTTP_SERVER_CLIENT_EOF), "End of file");
     done_testing();
     return 0;
 }

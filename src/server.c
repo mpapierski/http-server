@@ -204,22 +204,12 @@ int http_server_run(http_server * srv)
             if (FD_ISSET(it->sock, &rd))
             {
                 fprintf(stderr, "client data is available fd=%d\n", it->sock);
-                // Just ignore all the data for now
-                char tmp[1024];
-                int bytes_received = read(it->sock, tmp, sizeof(tmp));
-                if (bytes_received == -1)
+                if (http_server_socket_action(srv, it->sock, HTTP_SERVER_POLL_IN) != HTTP_SERVER_OK)
                 {
-                    perror("recv");
+                    fprintf(stderr, "failed to do socket action on fd=%d\n", it->sock);
                     FD_CLR(it->sock, &ev->rdset);
-                }
-                else if (bytes_received == 0)
-                {
-                    fprintf(stderr, "client eof %d\n", it->sock);
-                    FD_CLR(it->sock, &ev->rdset);
-                }
-                else
-                {
-                    fprintf(stderr, "received %d bytes from %d\n", bytes_received, it->sock);
+                    close(it->sock);
+                    http_server_pop_client(srv, it->sock);
                 }
             }
         }
@@ -262,14 +252,26 @@ int http_server_run(http_server * srv)
 
 int http_server_assign(http_server * srv, http_server_socket_t sock, void * data)
 {
+    int r = HTTP_SERVER_OK;
     if (sock == srv->sock_listen)
     {
         srv->sock_listen_data = data;
-        return HTTP_SERVER_OK;
+        return r;
     }
-    // TODO: Some data structore that holds pair of socket->data
-    // where sockets is a some dynamic extendable list.
-    return HTTP_SERVER_NOTIMPL;
+    // Check if client exists on the list
+    http_server_client * it = NULL;
+    r = HTTP_SERVER_INVALID_PARAM;
+    SLIST_FOREACH(it, &srv->clients, next)
+    {
+        assert(it);
+        if (it->sock == sock)
+        {
+            it->data = data;
+            r = HTTP_SERVER_OK;
+            break;
+        }
+    }
+    return r;
 }
 
 int http_server_add_client(http_server * srv, http_server_socket_t sock)
@@ -314,6 +316,46 @@ int http_server_pop_client(http_server * srv, http_server_socket_t sock)
             free(it);
             r = HTTP_SERVER_OK;
             break;
+        }
+    }
+    return r;
+}
+
+int http_server_socket_action(http_server * srv, http_server_socket_t socket, int flags)
+{
+    assert(srv);
+    int r = HTTP_SERVER_OK;
+    http_server_client * it, * client = NULL;
+    SLIST_FOREACH(it, &srv->clients, next)
+    {
+        assert(it);
+        if (it->sock == socket)
+        {
+            client = it;
+            break;
+        }
+    }
+    if (!client)
+    {
+        return HTTP_SERVER_INVALID_PARAM;
+    }
+    if (flags & HTTP_SERVER_POLL_IN)
+    {
+        // Read data
+        char tmp[1024];
+        int bytes_received = read(client->sock, tmp, sizeof(tmp));
+        if (bytes_received == -1)
+        {
+            r = HTTP_SERVER_SOCKET_ERROR;
+        }
+        else if (bytes_received == 0)
+        {
+            fprintf(stderr, "client eof %d\n", client->sock);
+            r = HTTP_SERVER_CLIENT_EOF;
+        }
+        else
+        {
+            fprintf(stderr, "received %d bytes from %d\n", bytes_received, client->sock);
         }
     }
     return r;

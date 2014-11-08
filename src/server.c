@@ -14,6 +14,8 @@
 
 typedef struct
 {
+    // owner of the event handler
+    http_server * srv;
     // sockets for reading
     fd_set rdset;
     // sockets for writing
@@ -67,25 +69,14 @@ static int _default_opensocket_function(void * clientp)
 static int _default_socket_function(void * clientp, http_server_socket_t sock, int flags, void * socketp)
 {
     // Data assigned to listening socket is a `fd_set` 
-    http_server * srv = clientp;
-    default_event_handler * ev = socketp;
-    int r;
-    if (!ev)
-    {
-        fprintf(stderr, "new event handler\n");
-        // Create empty event handler
-        ev = malloc(sizeof(default_event_handler));
-        r = http_server_assign(srv, sock, ev);
-        assert(r == HTTP_SERVER_OK);
-        FD_ZERO(&ev->rdset);
-        FD_ZERO(&ev->wrset);
-        ev->nsock = 0;
-    }
+    default_event_handler * ev = clientp;
+    http_server * srv = ev->srv;
     assert(ev);
     fprintf(stderr, "sock: %d\n", sock);
     // POLL_IN means "check for read ability"
     if (flags & HTTP_SERVER_POLL_IN)
     {
+        fprintf(stderr, "poll in fd=%d\n", sock);
         FD_SET(sock, &ev->rdset);
         if (sock > ev->nsock)
         {
@@ -97,12 +88,20 @@ static int _default_socket_function(void * clientp, http_server_socket_t sock, i
 
 int http_server_init(http_server * srv)
 {
+    // Create new default event handler
+    default_event_handler * ev = malloc(sizeof(default_event_handler));
+    ev->srv = srv;
+    FD_ZERO(&ev->rdset);
+    FD_ZERO(&ev->wrset);
+    ev->nsock = 0;
+    srv->socket_data = ev;
+
     srv->sock_listen = HTTP_SERVER_INVALID_SOCKET;
-    srv->sock_listen_data = NULL;
+    srv->sock_listen_data = ev;
     srv->opensocket_func = &_default_opensocket_function;
     srv->opensocket_data = srv;
     srv->socket_func = &_default_socket_function;
-    srv->socket_data = srv;
+
     SLIST_INIT(&srv->clients);
     return HTTP_SERVER_OK;
 }
@@ -196,7 +195,36 @@ int http_server_run(http_server * srv)
             // Nothing to do...
             continue;
         }
-        if (FD_ISSET(srv->sock_listen, &ev->rdset))
+        
+        // Check if client exists on the list
+        http_server_client * it = NULL;
+        SLIST_FOREACH(it, &srv->clients, next)
+        {
+            assert(it);
+            if (FD_ISSET(it->sock, &rd))
+            {
+                fprintf(stderr, "client data is available fd=%d\n", it->sock);
+                // Just ignore all the data for now
+                char tmp[1024];
+                int bytes_received = read(it->sock, tmp, sizeof(tmp));
+                if (bytes_received == -1)
+                {
+                    perror("recv");
+                    FD_CLR(it->sock, &ev->rdset);
+                }
+                else if (bytes_received == 0)
+                {
+                    fprintf(stderr, "client eof %d\n", it->sock);
+                    FD_CLR(it->sock, &ev->rdset);
+                }
+                else
+                {
+                    fprintf(stderr, "received %d bytes from %d\n", bytes_received, it->sock);
+                }
+            }
+        }
+
+        if (FD_ISSET(srv->sock_listen, &rd))
         {
             // Check for new connection
             // This will create new client structure and it will be
@@ -216,11 +244,15 @@ int http_server_run(http_server * srv)
             {
                 // If we can't manage this socket then disconnect it.
                 close(fd);
+                continue;
             }
             if (srv->socket_func(srv->socket_data, srv->sock_listen, HTTP_SERVER_POLL_IN, srv->sock_listen_data) != HTTP_SERVER_OK)
             {
+                (void)http_server_pop_client(srv, fd);
                 close(fd);
+                continue;
             }
+            fprintf(stderr, "new client: %d\n", fd);
             continue;
         }
     }
@@ -260,8 +292,10 @@ int http_server_add_client(http_server * srv, http_server_socket_t sock)
     it = malloc(sizeof(http_server_client));
     it->sock = sock;
     it->data = NULL;
-    SLIST_INSERT_HEAD(&srv->clients, it, next);   
-    return HTTP_SERVER_OK;    
+    SLIST_INSERT_HEAD(&srv->clients, it, next);
+    // Start polling for read
+    int r = srv->socket_func(srv->socket_data, it->sock, HTTP_SERVER_POLL_IN, it->data);
+    return r;
 }
 
 int http_server_pop_client(http_server * srv, http_server_socket_t sock)

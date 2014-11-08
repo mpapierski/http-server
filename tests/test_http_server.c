@@ -48,10 +48,10 @@ void test_setopt()
     ok(srv.socket_func == &_socket_function, "setopt (socket function) is correct");
 }
 
-void test_run()
+void test_start()
 {
     int r;
-    r = http_server_run(&srv);
+    r = http_server_start(&srv);
     cmp_ok(r, "==", HTTP_SERVER_OK);
     cmp_ok(srv.sock_listen, "!=", HTTP_SERVER_INVALID_SOCKET);
 }
@@ -61,12 +61,42 @@ void test_cleanup()
     http_server_free(&srv);
 }
 
+void test_manage_clients()
+{
+    int r;
+    
+    r = http_server_add_client(&srv, 100);
+    cmp_ok(r, "==", HTTP_SERVER_OK);
+
+    r = http_server_add_client(&srv, 200);
+    cmp_ok(r, "==", HTTP_SERVER_OK);
+
+    r = http_server_add_client(&srv, 300);
+    cmp_ok(r, "==", HTTP_SERVER_OK);
+
+    r = http_server_add_client(&srv, 300);
+    cmp_ok(r, "==", HTTP_SERVER_SOCKET_EXISTS);
+
+    r = http_server_pop_client(&srv, 300);
+    cmp_ok(r, "==", HTTP_SERVER_OK);
+
+    r = http_server_add_client(&srv, 300);
+    cmp_ok(r, "==", HTTP_SERVER_OK);
+
+    r = http_server_pop_client(&srv, 300);
+    cmp_ok(r, "==", HTTP_SERVER_OK);
+
+    r = http_server_pop_client(&srv, 300);
+    cmp_ok(r, "==", HTTP_SERVER_INVALID_SOCKET);
+}
+
 int main(int argc, char * argv[])
 {
     test_init();
     test_setopt();
     test_cleanup();
-    test_run();
+    test_start();
+    test_manage_clients();
     done_testing();
     return 0;
 }

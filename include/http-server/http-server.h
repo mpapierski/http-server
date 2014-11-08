@@ -1,6 +1,8 @@
 #if !defined(HTTP_SERVER_HTTP_SERVER_INCLUDED_H_)
 #define HTTP_SERVER_HTTP_SERVER_INCLUDED_H_
 
+#include <sys/queue.h>
+
 /**
  * Platform dependent socket type.
  */
@@ -43,6 +45,16 @@ typedef http_server_socket_t (*http_server_opensocket_callback)(void * clientp);
  */
 typedef int (*http_server_socket_callback)(void * clientp, http_server_socket_t sock, int flags, void * socketp);
 
+/**
+ * Represents single HTTP client connection.
+ */
+typedef struct http_server_client
+{
+    http_server_socket_t sock;
+    void * data;
+    SLIST_ENTRY(http_server_client) next;
+} http_server_client;
+
 typedef struct {
     /**
      * Socket listener. This is the socket that listens for connections.
@@ -69,6 +81,10 @@ typedef struct {
      * Custom data pointer for `socket_func` that user provides
      */
     void * socket_data;
+    /**
+     * All connected clients
+     */
+    SLIST_HEAD(slisthead, http_server_client) clients;
 } http_server;
 
 // Error codes
@@ -76,12 +92,14 @@ typedef enum {
     HTTP_SERVER_OK = 0,
     HTTP_SERVER_SOCKET_ERROR, // Invalid socket error
     HTTP_SERVER_NOTIMPL, // Not implemented error
+    HTTP_SERVER_SOCKET_EXISTS, // Socket is already managed
+    HTTP_SERVER_INVALID_PARAM, // Invalid parameter
 } http_server_errno;
 
 // Poll for reading
-#define HTTP_SERVER_POLL_IN 0
+#define HTTP_SERVER_POLL_IN 1<<1
 // Poll for writing
-#define HTTP_SERVER_POLL_OUT 1
+#define HTTP_SERVER_POLL_OUT 1<<2
 
 /**
  * Sets up HTTP server instance private fields.
@@ -122,5 +140,19 @@ int http_server_run(http_server * srv);
  * @param data Data
  */
 int http_server_assign(http_server * srv, http_server_socket_t sock, void * data);
+
+/**
+ * Adds new client to manage.
+ * @param srv Server
+ * @param sock Socket
+ */
+int http_server_add_client(http_server * srv, http_server_socket_t sock);
+
+/**
+ * Remove client from the list
+ * @param srv Server
+ * @param sock Socket
+ */
+int http_server_pop_client(http_server * srv, http_server_socket_t sock);
 
 #endif

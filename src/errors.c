@@ -11,6 +11,10 @@ char * http_server_errstr(http_server_errno e)
         return "Invalid socket";
     case HTTP_SERVER_NOTIMPL:
         return "Not implemented error";
+    case HTTP_SERVER_SOCKET_EXISTS:
+        return "Socket is already managed";
+    case HTTP_SERVER_INVALID_PARAM:
+        return "Invalid parameter";
     default:
         // Invalid error code
         return 0;

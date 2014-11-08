@@ -8,7 +8,9 @@
 #include <netdb.h>          /* hostent struct, gethostbyname() */
 #include <arpa/inet.h>      /* inet_ntoa() to format IP address */
 #include <netinet/in.h>     /* in_addr structure */
-
+#include <fcntl.h>
+#include <unistd.h>
+#include <strings.h>
 
 typedef struct
 {
@@ -39,8 +41,12 @@ static int _default_opensocket_function(void * clientp)
         perror("setsockopt");
         return HTTP_SERVER_INVALID_SOCKET;
     }
+
+    int flags = fcntl(s, F_GETFL, 0);
+    fcntl(s, F_SETFL, flags | O_NONBLOCK);
+
     struct sockaddr_in sin;
-    sin.sin_port = htons(12000);
+    sin.sin_port = htons(5000);
     sin.sin_addr.s_addr = 0;
     sin.sin_addr.s_addr = INADDR_ANY;
     sin.sin_family = AF_INET;
@@ -83,7 +89,6 @@ static int _default_socket_function(void * clientp, http_server_socket_t sock, i
         FD_SET(sock, &ev->rdset);
         if (sock > ev->nsock)
         {
-
             ev->nsock = sock;
         }
     }
@@ -98,6 +103,7 @@ int http_server_init(http_server * srv)
     srv->opensocket_data = srv;
     srv->socket_func = &_default_socket_function;
     srv->socket_data = srv;
+    SLIST_INIT(&srv->clients);
     return HTTP_SERVER_OK;
 }
 
@@ -166,15 +172,17 @@ int http_server_run(http_server * srv)
 {
     int r;
     default_event_handler * ev = srv->sock_listen_data;
-    assert(ev);
     do
     {
+        fd_set rd, wr;
+        FD_COPY(&ev->rdset, &rd);
+        FD_COPY(&ev->wrset, &wr);
         // This will block
         struct timeval tv;
         tv.tv_sec = 1;
         tv.tv_usec = 0;
         fprintf(stderr, "select(%d, {%d}, ...)\n", ev->nsock + 1, srv->sock_listen);
-        r = select(ev->nsock + 1, &ev->rdset, &ev->wrset, 0, &tv);
+        r = select(ev->nsock + 1, &rd, &wr, 0, &tv);
         if (r == -1)
         {
             perror("select");
@@ -182,6 +190,38 @@ int http_server_run(http_server * srv)
         else
         {
             fprintf(stderr, "select result=%d\n", r);
+        }
+        if (r == 0)
+        {
+            // Nothing to do...
+            continue;
+        }
+        if (FD_ISSET(srv->sock_listen, &ev->rdset))
+        {
+            // Check for new connection
+            // This will create new client structure and it will be
+            // saved in list.
+            struct sockaddr_in cli_addr;
+            socklen_t clilen = sizeof(cli_addr);
+            // accept
+            FD_CLR(srv->sock_listen, &ev->rdset);
+            fprintf(stderr, "new conn\n");
+            int fd = accept(srv->sock_listen, (struct sockaddr *) &cli_addr, &clilen);
+            if (fd == -1)
+            {
+                perror("accept");
+            }
+            // Add this socket to managed list
+            if (http_server_add_client(srv, fd) != HTTP_SERVER_OK)
+            {
+                // If we can't manage this socket then disconnect it.
+                close(fd);
+            }
+            if (srv->socket_func(srv->socket_data, srv->sock_listen, HTTP_SERVER_POLL_IN, srv->sock_listen_data) != HTTP_SERVER_OK)
+            {
+                close(fd);
+            }
+            continue;
         }
     }
     while (r != -1);
@@ -198,4 +238,49 @@ int http_server_assign(http_server * srv, http_server_socket_t sock, void * data
     // TODO: Some data structore that holds pair of socket->data
     // where sockets is a some dynamic extendable list.
     return HTTP_SERVER_NOTIMPL;
+}
+
+int http_server_add_client(http_server * srv, http_server_socket_t sock)
+{
+    assert(srv);
+    if (sock == srv->sock_listen)
+    {
+        return HTTP_SERVER_SOCKET_EXISTS;
+    }
+    // Check if client exists on the list
+    http_server_client * it = NULL;
+    SLIST_FOREACH(it, &srv->clients, next)
+    {
+        assert(it);
+        if (it->sock == sock)
+        {
+            return HTTP_SERVER_SOCKET_EXISTS;
+        }
+    }
+    it = malloc(sizeof(http_server_client));
+    it->sock = sock;
+    it->data = NULL;
+    SLIST_INSERT_HEAD(&srv->clients, it, next);   
+    return HTTP_SERVER_OK;    
+}
+
+int http_server_pop_client(http_server * srv, http_server_socket_t sock)
+{
+    assert(srv);
+    int r = HTTP_SERVER_INVALID_SOCKET;
+    http_server_client * it = NULL;
+    SLIST_FOREACH(it, &srv->clients, next)
+    {
+        assert(it);
+        if (it->sock == sock)
+        {
+            SLIST_REMOVE(&srv->clients, it, http_server_client, next);
+            // TODO: close socket callback
+            close(it->sock);
+            free(it);
+            r = HTTP_SERVER_OK;
+            break;
+        }
+    }
+    return r;
 }

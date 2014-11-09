@@ -376,6 +376,7 @@ int http_server_socket_action(http_server * srv, http_server_socket_t socket, in
                 {
                     return HTTP_SERVER_SOCKET_ERROR;
                 }
+                close(it->sock);
             }
         }
     }

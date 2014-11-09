@@ -4,6 +4,8 @@ project (http_server C)
 option (HTTP_SERVER_TESTS "Build http-server tests" OFF)
 option (HTTP_SERVER_EXAMPLES "Build http-server examples" OFF)
 
+SET (CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
+
 include_directories (
     include/)
 

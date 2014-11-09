@@ -219,30 +219,12 @@ int http_server_run(http_server * srv)
             // Check for new connection
             // This will create new client structure and it will be
             // saved in list.
-            struct sockaddr_in cli_addr;
-            socklen_t clilen = sizeof(cli_addr);
-            // accept
             FD_CLR(srv->sock_listen, &ev->rdset);
-            fprintf(stderr, "new conn\n");
-            int fd = accept(srv->sock_listen, (struct sockaddr *) &cli_addr, &clilen);
-            if (fd == -1)
+            if (http_server_socket_action(srv, srv->sock_listen, HTTP_SERVER_POLL_IN) != HTTP_SERVER_OK)
             {
-                perror("accept");
-            }
-            // Add this socket to managed list
-            if (http_server_add_client(srv, fd) != HTTP_SERVER_OK)
-            {
-                // If we can't manage this socket then disconnect it.
-                close(fd);
+                fprintf(stderr, "unable to accept new client\n");
                 continue;
             }
-            if (srv->socket_func(srv->socket_data, srv->sock_listen, HTTP_SERVER_POLL_IN, srv->sock_listen_data) != HTTP_SERVER_OK)
-            {
-                (void)http_server_pop_client(srv, fd);
-                close(fd);
-                continue;
-            }
-            fprintf(stderr, "new client: %d\n", fd);
             continue;
         }
     }
@@ -324,6 +306,34 @@ int http_server_pop_client(http_server * srv, http_server_socket_t sock)
 int http_server_socket_action(http_server * srv, http_server_socket_t socket, int flags)
 {
     assert(srv);
+    if (socket == srv->sock_listen)
+    {
+        // Listening socket is a special kind of socket to be managed
+        struct sockaddr_in cli_addr;
+        socklen_t clilen = sizeof(cli_addr);
+        // accept
+        fprintf(stderr, "new conn\n");
+        int fd = accept(srv->sock_listen, (struct sockaddr *) &cli_addr, &clilen);
+        if (fd == -1)
+        {
+            perror("accept");
+        }
+        // Add this socket to managed list
+        if (http_server_add_client(srv, fd) != HTTP_SERVER_OK)
+        {
+            // If we can't manage this socket then disconnect it.
+            close(fd);
+            return HTTP_SERVER_SOCKET_ERROR;
+        }
+        if (srv->socket_func(srv->socket_data, srv->sock_listen, HTTP_SERVER_POLL_IN, srv->sock_listen_data) != HTTP_SERVER_OK)
+        {
+            (void)http_server_pop_client(srv, fd);
+            close(fd);
+            return HTTP_SERVER_SOCKET_ERROR;
+        }
+        fprintf(stderr, "new client: %d\n", fd);
+        return HTTP_SERVER_OK;
+    }
     int r = HTTP_SERVER_OK;
     http_server_client * it, * client = NULL;
     SLIST_FOREACH(it, &srv->clients, next)
@@ -352,6 +362,11 @@ int http_server_socket_action(http_server * srv, http_server_socket_t socket, in
         {
             fprintf(stderr, "client eof %d\n", client->sock);
             r = HTTP_SERVER_CLIENT_EOF;
+            if (srv->socket_func(srv->socket_data, it->sock, HTTP_SERVER_POLL_REMOVE, it->data) != HTTP_SERVER_OK)
+            {
+                return HTTP_SERVER_SOCKET_ERROR;
+            }
+            return r;
         }
         else
         {

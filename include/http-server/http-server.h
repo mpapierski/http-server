@@ -101,6 +101,8 @@ typedef enum {
 #define HTTP_SERVER_POLL_IN 1<<1
 // Poll for writing
 #define HTTP_SERVER_POLL_OUT 1<<2
+// Poll to be removed for further polling
+#define HTTP_SERVER_POLL_REMOVE 1<<3
 
 /**
  * Sets up HTTP server instance private fields.

@@ -83,6 +83,21 @@ static int _default_socket_function(void * clientp, http_server_socket_t sock, i
             ev->nsock = sock;
         }
     }
+    if (flags & HTTP_SERVER_POLL_REMOVE)
+    {
+        FD_CLR(sock, &ev->rdset);
+        // rebuild nsock
+        http_server_client * it = NULL;
+        ev->nsock = 0;
+        SLIST_FOREACH(it, &srv->clients, next)
+        {
+            assert(it);
+            if (it->sock > ev->nsock)
+            {
+                ev->nsock = it->sock;
+            }
+        }
+    }
     return HTTP_SERVER_OK;
 }
 
@@ -371,7 +386,7 @@ int http_server_socket_action(http_server * srv, http_server_socket_t socket, in
             fprintf(stderr, "received %d bytes from %d\n", bytes_received, client->sock);
             if (http_server_perform_client(client, tmp, bytes_received) != HTTP_SERVER_OK)
             {
-                // close connection
+                // TODO: close connection for now but this should be something like 400 BAD REQUEST.
                 if (srv->socket_func(srv->socket_data, it->sock, HTTP_SERVER_POLL_REMOVE, it->data) != HTTP_SERVER_OK)
                 {
                     return HTTP_SERVER_SOCKET_ERROR;

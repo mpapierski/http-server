@@ -181,7 +181,6 @@ success:
 
 int http_server_start(http_server * srv)
 {
-    int r;
     // Create listening socket
     srv->sock_listen = srv->opensocket_func(srv->opensocket_data);
     if (srv->sock_listen == HTTP_SERVER_INVALID_SOCKET)

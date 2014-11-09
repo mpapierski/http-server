@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <strings.h>
+#include <assert.h>
 
 static int my_url_callback(http_parser * parser, const char * at, size_t length)
 {
@@ -23,4 +24,17 @@ http_server_client * http_server_new_client(http_server_socket_t sock)
     client->parser_.data = client;
     client->parser_settings_.on_url = &my_url_callback;
     return client;
+}
+
+int http_server_perform_client(http_server_client * client, const char * at, size_t size)
+{
+    assert(client);
+    int nparsed = http_parser_execute(&client->parser_, &client->parser_settings_, at, size);
+    if (nparsed != size)
+    {
+        // Error
+        fprintf(stderr, "unable to execute parser %d/%d\n", (int)nparsed, (int)size);
+        return HTTP_SERVER_PARSER_ERROR;
+    }
+    return HTTP_SERVER_OK;
 }

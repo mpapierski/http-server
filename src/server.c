@@ -369,6 +369,14 @@ int http_server_socket_action(http_server * srv, http_server_socket_t socket, in
         else
         {
             fprintf(stderr, "received %d bytes from %d\n", bytes_received, client->sock);
+            if (http_server_perform_client(client, tmp, bytes_received) != HTTP_SERVER_OK)
+            {
+                // close connection
+                if (srv->socket_func(srv->socket_data, it->sock, HTTP_SERVER_POLL_REMOVE, it->data) != HTTP_SERVER_OK)
+                {
+                    return HTTP_SERVER_SOCKET_ERROR;
+                }
+            }
         }
     }
     return r;

@@ -109,7 +109,8 @@ typedef struct {
     XX(NOTIMPL, 2, "Not implemented error") \
     XX(SOCKET_EXISTS, 3, "Socket is already managed") \
     XX(INVALID_PARAM, 4, "Invalid parameter") \
-    XX(CLIENT_EOF, 5, "End of file")
+    XX(CLIENT_EOF, 5, "End of file") \
+    XX(PARSER_ERROR, 6, "Unable to parse HTTP request")
 
 #define HTTP_SERVER_ENUM_ERRNO(name, val, descr) \
     HTTP_SERVER_ ## name = val,
@@ -194,5 +195,10 @@ int http_server_socket_action(http_server * srv, http_server_socket_t socket, in
  * Create new HTTP client instance
  */
 http_server_client * http_server_new_client(http_server_socket_t sock);
+
+/**
+ * Feeds client using chunk of data
+ */
+int http_server_perform_client(http_server_client * client, const char * at, size_t size);
 
 #endif

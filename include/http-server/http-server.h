@@ -1,7 +1,9 @@
 #if !defined(HTTP_SERVER_HTTP_SERVER_INCLUDED_H_)
 #define HTTP_SERVER_HTTP_SERVER_INCLUDED_H_
 
+#include <stddef.h>
 #include <sys/queue.h>
+#include "http_parser.h"
 
 /**
  * Platform dependent socket type.
@@ -53,7 +55,21 @@ typedef struct http_server_client
     http_server_socket_t sock;
     void * data;
     SLIST_ENTRY(http_server_client) next;
+    // private:
+    http_parser_settings parser_settings_;
+    http_parser parser_; // private
 } http_server_client;
+
+// Request handler
+
+/** Received a chunk of URL */
+typedef int (*http_server_handler_url_cb)(http_server_client * client, void * data, char * buf, size_t size);
+
+typedef struct
+{
+    void * data;
+    http_server_handler_url_cb on_url;
+} http_server_handler;
 
 typedef struct {
     /**
@@ -173,5 +189,10 @@ int http_server_pop_client(http_server * srv, http_server_socket_t sock);
  * @param flags Flags (mix of flags: HTTP_SERVER_POLL_IN|HTTP_SERVER_POLL_OUT)
  */
 int http_server_socket_action(http_server * srv, http_server_socket_t socket, int flags);
+
+/**
+ * Create new HTTP client instance
+ */
+http_server_client * http_server_new_client(http_server_socket_t sock);
 
 #endif

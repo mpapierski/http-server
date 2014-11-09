@@ -273,9 +273,7 @@ int http_server_add_client(http_server * srv, http_server_socket_t sock)
             return HTTP_SERVER_SOCKET_EXISTS;
         }
     }
-    it = malloc(sizeof(http_server_client));
-    it->sock = sock;
-    it->data = NULL;
+    it = http_server_new_client(sock);
     SLIST_INSERT_HEAD(&srv->clients, it, next);
     // Start polling for read
     int r = srv->socket_func(srv->socket_data, it->sock, HTTP_SERVER_POLL_IN, it->data);

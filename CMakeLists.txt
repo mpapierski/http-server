@@ -6,8 +6,10 @@ option (HTTP_SERVER_EXAMPLES "Build http-server examples" OFF)
 
 SET (CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 
+add_subdirectory (deps)
 include_directories (
-    include/)
+    include/
+    deps/http-parser/)
 
 add_subdirectory (src)
 

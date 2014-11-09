@@ -6,15 +6,17 @@
 
 static int my_url_callback(http_parser * parser, const char * at, size_t length)
 {
+    http_server_client * client = parser->data;
     fprintf(stderr, "url chunk: %.*s\n", (int)length, at);
-    return 0;
+    return client->handler_->on_url(client, client->handler_->on_url_data, at, length);
 }
 
-http_server_client * http_server_new_client(http_server_socket_t sock)
+http_server_client * http_server_new_client(http_server_socket_t sock, http_server_handler * handler)
 {
     http_server_client * client = malloc(sizeof(http_server_client));
     client->sock = sock;
     client->data = NULL;
+    client->handler_ = handler;
     // Initialize http parser stuff
     http_parser_settings settings;
     bzero(&settings, sizeof(settings));

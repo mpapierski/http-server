@@ -28,6 +28,8 @@ typedef enum {
     HTTP_SERVER_CINIT(SOCKET_DATA, POINTER, 4),
     HTTP_SERVER_CINIT(CLOSE_SOCKET_FUNCTION, FUNCTION, 5),
     HTTP_SERVER_CINIT(CLOSE_SOCKET_DATA, POINTER, 6),
+    HTTP_SERVER_CINIT(HANDLER, POINTER, 7),
+    HTTP_SERVER_CINIT(HANDLER_DATA, POINTER, 8),
 } http_server_option;
 
 /**
@@ -47,6 +49,20 @@ typedef http_server_socket_t (*http_server_opensocket_callback)(void * clientp);
  */
 typedef int (*http_server_socket_callback)(void * clientp, http_server_socket_t sock, int flags, void * socketp);
 
+// Request handler
+
+struct http_server_client;
+
+/** Received a chunk of URL */
+typedef int (*http_server_handler_url_cb)(struct http_server_client * client, void * data, const char * buf, size_t size);
+
+typedef struct http_server_handler
+{
+    void * data;
+    http_server_handler_url_cb on_url;
+    void * on_url_data;
+} http_server_handler;
+
 /**
  * Represents single HTTP client connection.
  */
@@ -58,18 +74,8 @@ typedef struct http_server_client
     // private:
     http_parser_settings parser_settings_;
     http_parser parser_; // private
+    http_server_handler * handler_;
 } http_server_client;
-
-// Request handler
-
-/** Received a chunk of URL */
-typedef int (*http_server_handler_url_cb)(http_server_client * client, void * data, char * buf, size_t size);
-
-typedef struct
-{
-    void * data;
-    http_server_handler_url_cb on_url;
-} http_server_handler;
 
 typedef struct {
     /**
@@ -101,6 +107,10 @@ typedef struct {
      * All connected clients
      */
     SLIST_HEAD(slisthead, http_server_client) clients;
+    /**
+     * Handler for all connections
+     */
+    http_server_handler * handler_;
 } http_server;
 
 #define HTTP_SERVER_ENUM_ERROR_CODES(XX) \
@@ -194,7 +204,7 @@ int http_server_socket_action(http_server * srv, http_server_socket_t socket, in
 /**
  * Create new HTTP client instance
  */
-http_server_client * http_server_new_client(http_server_socket_t sock);
+http_server_client * http_server_new_client(http_server_socket_t sock, http_server_handler * handler);
 
 /**
  * Feeds client using chunk of data

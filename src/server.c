@@ -116,6 +116,7 @@ int http_server_init(http_server * srv)
     srv->opensocket_func = &_default_opensocket_function;
     srv->opensocket_data = srv;
     srv->socket_func = &_default_socket_function;
+    srv->handler_ = NULL;
 
     SLIST_INIT(&srv->clients);
     return HTTP_SERVER_OK;
@@ -146,6 +147,16 @@ int http_server_setopt(http_server * srv, http_server_option opt, ...)
         {
             srv->socket_data = ptr;
             fprintf(stderr, "set socket func data %p\n", ptr);
+        }
+        if (opt == HTTP_SERVER_OPT_HANDLER)
+        {
+            srv->handler_ = ptr;
+            fprintf(stderr, "set handler %p\n", ptr);
+        }
+        if (opt == HTTP_SERVER_OPT_HANDLER_DATA)
+        {
+            srv->handler_->data = ptr;
+            fprintf(stderr, "set handler data %p\n", ptr);
         }
         goto success;
     }
@@ -288,7 +299,7 @@ int http_server_add_client(http_server * srv, http_server_socket_t sock)
             return HTTP_SERVER_SOCKET_EXISTS;
         }
     }
-    it = http_server_new_client(sock);
+    it = http_server_new_client(sock, srv->handler_);
     SLIST_INSERT_HEAD(&srv->clients, it, next);
     // Start polling for read
     int r = srv->socket_func(srv->socket_data, it->sock, HTTP_SERVER_POLL_IN, it->data);

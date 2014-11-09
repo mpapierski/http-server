@@ -6,6 +6,7 @@
 
 uv_loop_t * loop;
 http_server srv;
+http_server_handler handler;
 
 typedef struct
 {
@@ -69,12 +70,26 @@ int _socket_function(void * clientp, http_server_socket_t sock, int flags, void 
     return HTTP_SERVER_OK;
 }
 
+// HTTP handler callbacks
+
+int on_url(http_server_client * client, void * data, const char * buf, size_t size)
+{
+    fprintf(stderr, "URL chunk: %.*s\n", (int)size, buf);
+    return 0;
+}
+
 int main(int argc, char * argv[])
 {
     loop = uv_default_loop();
     int result;
     http_server_init(&srv);
     srv.sock_listen_data = NULL; // should be null by default
+
+    handler.on_url = &on_url;
+
+    result = http_server_setopt(&srv, HTTP_SERVER_OPT_HANDLER, &handler);
+    result = http_server_setopt(&srv, HTTP_SERVER_OPT_HANDLER_DATA, &srv);
+
     // Set options
     //result = http_server_setopt(&srv, HTTP_SERVER_OPT_OPEN_SOCKET_DATA, NULL);
     

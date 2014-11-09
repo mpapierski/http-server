@@ -3,22 +3,13 @@
 
 char * http_server_errstr(http_server_errno e)
 {
+#define XX(id, value, descr) case HTTP_SERVER_ ## id: return descr;
     switch (e)
     {
-    case HTTP_SERVER_OK:
-        return "Success";
-    case HTTP_SERVER_SOCKET_ERROR:
-        return "Invalid socket";
-    case HTTP_SERVER_NOTIMPL:
-        return "Not implemented error";
-    case HTTP_SERVER_SOCKET_EXISTS:
-        return "Socket is already managed";
-    case HTTP_SERVER_INVALID_PARAM:
-        return "Invalid parameter";
-    case HTTP_SERVER_CLIENT_EOF:
-        return "End of file";
+    HTTP_SERVER_ENUM_ERROR_CODES(XX)
     default:
         // Invalid error code
         return 0;
     }
+#undef XX
 }

@@ -87,15 +87,23 @@ typedef struct {
     SLIST_HEAD(slisthead, http_server_client) clients;
 } http_server;
 
+#define HTTP_SERVER_ENUM_ERROR_CODES(XX) \
+    XX(OK, 0, "Success") \
+    XX(SOCKET_ERROR, 1, "Invalid socket") \
+    XX(NOTIMPL, 2, "Not implemented error") \
+    XX(SOCKET_EXISTS, 3, "Socket is already managed") \
+    XX(INVALID_PARAM, 4, "Invalid parameter") \
+    XX(CLIENT_EOF, 5, "End of file")
+
+#define HTTP_SERVER_ENUM_ERRNO(name, val, descr) \
+    HTTP_SERVER_ ## name = val,
+
 // Error codes
 typedef enum {
-    HTTP_SERVER_OK = 0,
-    HTTP_SERVER_SOCKET_ERROR, // Invalid socket error
-    HTTP_SERVER_NOTIMPL, // Not implemented error
-    HTTP_SERVER_SOCKET_EXISTS, // Socket is already managed
-    HTTP_SERVER_INVALID_PARAM, // Invalid parameter
-    HTTP_SERVER_CLIENT_EOF, // End of file
+    HTTP_SERVER_ENUM_ERROR_CODES(HTTP_SERVER_ENUM_ERRNO)
 } http_server_errno;
+
+#undef HTTP_SERVER_ENUM_ERRNO
 
 // Poll for reading
 #define HTTP_SERVER_POLL_IN 1<<1

@@ -375,7 +375,7 @@ int http_server_socket_action(http_server * srv, http_server_socket_t socket, in
     if (flags & HTTP_SERVER_POLL_IN)
     {
         // Read data
-        char tmp[1024];
+        char tmp[16384];
         int bytes_received = read(client->sock, tmp, sizeof(tmp));
         if (bytes_received == -1)
         {
@@ -384,6 +384,10 @@ int http_server_socket_action(http_server * srv, http_server_socket_t socket, in
         else if (bytes_received == 0)
         {
             fprintf(stderr, "client eof %d\n", client->sock);
+            if (http_server_perform_client(client, tmp, bytes_received) != HTTP_SERVER_OK)
+            {
+                return HTTP_SERVER_SOCKET_ERROR;
+            }
             r = HTTP_SERVER_CLIENT_EOF;
             if (srv->socket_func(srv->socket_data, it->sock, HTTP_SERVER_POLL_REMOVE, it->data) != HTTP_SERVER_OK)
             {
@@ -402,6 +406,7 @@ int http_server_socket_action(http_server * srv, http_server_socket_t socket, in
                     return HTTP_SERVER_SOCKET_ERROR;
                 }
                 close(it->sock);
+                return r;
             }
         }
     }

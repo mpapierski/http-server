@@ -78,6 +78,12 @@ int on_url(http_server_client * client, void * data, const char * buf, size_t si
     return 0;
 }
 
+int on_message_complete(http_server_client * client, void * data)
+{
+    fprintf(stderr, "Message complete\n");
+    return 0;
+}
+
 int main(int argc, char * argv[])
 {
     loop = uv_default_loop();
@@ -85,7 +91,9 @@ int main(int argc, char * argv[])
     http_server_init(&srv);
     srv.sock_listen_data = NULL; // should be null by default
 
+    bzero(&handler, sizeof(handler));
     handler.on_url = &on_url;
+    handler.on_message_complete = &on_message_complete;
 
     result = http_server_setopt(&srv, HTTP_SERVER_OPT_HANDLER, &handler);
     result = http_server_setopt(&srv, HTTP_SERVER_OPT_HANDLER_DATA, &srv);

@@ -54,13 +54,19 @@ typedef int (*http_server_socket_callback)(void * clientp, http_server_socket_t 
 struct http_server_client;
 
 /** Received a chunk of URL */
-typedef int (*http_server_handler_url_cb)(struct http_server_client * client, void * data, const char * buf, size_t size);
+typedef int (*http_server_handler_data_cb)(struct http_server_client * client, void * data, const char * buf, size_t size);
+
+/** Callback without args */
+typedef int (*http_server_handler_cb)(struct http_server_client * client, void * data);
+
 
 typedef struct http_server_handler
 {
     void * data;
-    http_server_handler_url_cb on_url;
+    http_server_handler_data_cb on_url;
     void * on_url_data;
+    http_server_handler_cb on_message_complete;
+    void * on_message_complete_data;
 } http_server_handler;
 
 /**

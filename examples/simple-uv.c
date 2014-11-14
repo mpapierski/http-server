@@ -44,9 +44,15 @@ void http_perform(uv_poll_t *req, int status, int events)
     {
         flags |= HTTP_SERVER_POLL_IN;
     }
+    if (events & UV_WRITABLE)
+    {
+        flags |= HTTP_SERVER_POLL_OUT;
+    }
     assert(flags);
     fprintf(stderr, "execute socket action %d\n", ctx->sockfd);
+    uv_poll_stop(req);
     http_server_socket_action(&srv, ctx->sockfd, flags);
+
 }
 
 int _socket_function(void * clientp, http_server_socket_t sock, int flags, void * socketp)
@@ -62,6 +68,10 @@ int _socket_function(void * clientp, http_server_socket_t sock, int flags, void 
     if (flags & HTTP_SERVER_POLL_IN)
     {
         uv_poll_start(&ctx->poll_handle, UV_READABLE, http_perform);
+    }
+    if (flags & HTTP_SERVER_POLL_OUT)
+    {
+        uv_poll_start(&ctx->poll_handle, UV_WRITABLE, http_perform);
     }
     if (flags & HTTP_SERVER_POLL_REMOVE)
     {
@@ -81,6 +91,14 @@ int on_url(http_server_client * client, void * data, const char * buf, size_t si
 int on_message_complete(http_server_client * client, void * data)
 {
     fprintf(stderr, "Message complete\n");
+    http_server_response * res = http_server_response_new();
+    assert(res);
+    int r = http_server_response_begin(client, res);
+    assert(r == HTTP_SERVER_OK);
+    r = http_server_response_send(res, "Hello world", 11);
+    assert(r == HTTP_SERVER_OK);
+    r = http_server_response_end(res);
+    assert(r == HTTP_SERVER_OK);
     return 0;
 }
 

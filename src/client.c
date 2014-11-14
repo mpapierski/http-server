@@ -27,7 +27,7 @@ static int my_on_body(http_parser * parser, const char * at, size_t length)
 }
 
 
-http_server_client * http_server_new_client(http_server_socket_t sock, http_server_handler * handler)
+http_server_client * http_server_new_client(http_server * server, http_server_socket_t sock, http_server_handler * handler)
 {
     http_server_client * client = malloc(sizeof(http_server_client));
     client->sock = sock;
@@ -41,6 +41,9 @@ http_server_client * http_server_new_client(http_server_socket_t sock, http_serv
     client->parser_settings_.on_url = &my_url_callback;
     client->parser_settings_.on_body = &my_on_body;
     client->parser_settings_.on_message_complete = &my_message_complete_callback;
+    // Response should be NULL so we know when to poll for WRITE
+    client->current_response_ = NULL;
+    client->server_ = server;
     return client;
 }
 

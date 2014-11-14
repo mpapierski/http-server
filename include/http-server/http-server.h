@@ -70,6 +70,21 @@ typedef struct http_server_handler
 } http_server_handler;
 
 /**
+ * HTTP rresponse object
+ */
+typedef struct http_server_response
+{
+    // Owner. Could be NULL in case the response is not tied to
+    // a particular client.
+    struct http_server_client * client;
+    // queued data. this is raw HTTP response
+    char * data_;
+    int size_;
+} http_server_response;
+
+struct http_server;
+
+/**
  * Represents single HTTP client connection.
  */
 typedef struct http_server_client
@@ -81,9 +96,12 @@ typedef struct http_server_client
     http_parser_settings parser_settings_;
     http_parser parser_; // private
     http_server_handler * handler_;
+    http_server_response * current_response_;
+    struct http_server * server_;
 } http_server_client;
 
-typedef struct {
+typedef struct http_server
+{
     /**
      * Socket listener. This is the socket that listens for connections.
      */
@@ -117,6 +135,10 @@ typedef struct {
      * Handler for all connections
      */
     http_server_handler * handler_;
+    /**
+     * Current HTTP response
+     */
+    http_server_response * response_;
 } http_server;
 
 #define HTTP_SERVER_ENUM_ERROR_CODES(XX) \
@@ -210,11 +232,34 @@ int http_server_socket_action(http_server * srv, http_server_socket_t socket, in
 /**
  * Create new HTTP client instance
  */
-http_server_client * http_server_new_client(http_server_socket_t sock, http_server_handler * handler);
+http_server_client * http_server_new_client(http_server * server, http_server_socket_t sock, http_server_handler * handler);
 
 /**
- * Feeds client using chunk of data
+ * Feeds client using chunk of datad    
  */
 int http_server_perform_client(http_server_client * client, const char * at, size_t size);
+
+/**
+ * Creates new response object
+ */
+http_server_response * http_server_response_new();
+
+/**
+ * Queues response to the client.
+ */
+int http_server_response_begin(http_server_client * client, http_server_response * res);
+
+/**
+ * Response is done.
+ */
+int http_server_response_end(http_server_response * client);
+
+/**
+ * Write some data to the responses
+ * @param res Response
+ * @param data Data
+ * @param size Size
+ */
+int http_server_response_send(http_server_response * res, char * data, int size);
 
 #endif

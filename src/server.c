@@ -11,6 +11,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <strings.h>
+#include <errno.h>
 
 typedef struct
 {
@@ -298,7 +299,7 @@ int http_server_add_client(http_server * srv, http_server_socket_t sock)
             return HTTP_SERVER_SOCKET_EXISTS;
         }
     }
-    it = http_server_new_client(sock, srv->handler_);
+    it = http_server_new_client(srv, sock, srv->handler_);
     SLIST_INSERT_HEAD(&srv->clients, it, next);
     // Start polling for read
     int r = srv->socket_func(srv->socket_data, it->sock, HTTP_SERVER_POLL_IN, it->data);
@@ -409,6 +410,33 @@ int http_server_socket_action(http_server * srv, http_server_socket_t socket, in
                 return r;
             }
         }
+    }
+    if (flags & HTTP_SERVER_POLL_OUT)
+    {
+        if (!client->current_response_)
+        {
+            fprintf(stderr, "Poll out but no response set in client %d\n", client->sock);
+            return HTTP_SERVER_SOCKET_ERROR;
+        }
+        // TODO: `res` will be some iterator in future
+        http_server_response * res = client->current_response_;
+        int bytes_transferred = write(client->sock, res->data_, res->size_);
+        if (bytes_transferred == -1)
+        {
+            // Unable to send data?
+            int e = errno;
+            fprintf(stderr, "Unable to write data to client %d: %d\n", e, bytes_transferred);
+            return HTTP_SERVER_SOCKET_ERROR;
+        }
+        fprintf(stderr, "Client %d: written %d bytes\n", client->sock, bytes_transferred);
+        memcpy(res->data_, res->data_ + bytes_transferred, bytes_transferred);
+        res->data_ = realloc(res->data_, res->size_ - bytes_transferred);
+        if (!res->data_)
+        {
+            fprintf(stderr, "memory error!\n");
+            return HTTP_SERVER_SOCKET_ERROR;
+        }
+        res->size_ -= bytes_transferred;
     }
     return r;
 }

@@ -11,7 +11,7 @@ static int _response_add_buffer(http_server_response * res, char * data, int siz
     {
         return -1;
     }
-    new_buffer->data = malloc(size);
+    new_buffer->mem = new_buffer->data = malloc(size);
     if (!new_buffer->data)
     {
         free(new_buffer);
@@ -19,7 +19,7 @@ static int _response_add_buffer(http_server_response * res, char * data, int siz
     }
     memcpy(new_buffer->data, data, size);
     new_buffer->size = size;
-    STAILQ_INSERT_TAIL(&res->buffer, new_buffer, bufs);
+    TAILQ_INSERT_TAIL(&res->buffer, new_buffer, bufs);
     return 0;
 }
 
@@ -30,7 +30,7 @@ http_server_response * http_server_response_new()
     {
         return 0;
     }
-    STAILQ_INIT(&res->buffer);
+    TAILQ_INIT(&res->buffer);
     return res;
 }
 
@@ -63,7 +63,7 @@ int http_server_response_end(http_server_response * res)
 
 int http_server_response__flush(http_server_response * res)
 {
-    if (STAILQ_EMPTY(&res->buffer))
+    if (TAILQ_EMPTY(&res->buffer))
     {
         return HTTP_SERVER_OK;
     }
@@ -108,10 +108,10 @@ int http_server_response_set_header(http_server_response * res, char * name, int
 int http_server_response_write(http_server_response * res, char * data, int size)
 {
     // TODO: Check for headers, do content encoding
-    assert(size < 1024);
-    char frame[1024];
+    char * frame = malloc(1024 + size);
     int frame_length = sprintf(frame, "%x\r\n%.*s\r\n", size, size, data);
     int r = _response_add_buffer(res, frame, frame_length);
     assert(r == 0);
+    free(frame);
     return http_server_response__flush(res);
 }

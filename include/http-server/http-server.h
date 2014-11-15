@@ -71,9 +71,10 @@ typedef struct http_server_handler
 
 typedef struct http_server_buf
 {
-    char * data;
+    char * mem; // Memory
+    char * data; // Actual data (mem > data is possible)
     int size;
-    STAILQ_ENTRY(http_server_buf) bufs;
+    TAILQ_ENTRY(http_server_buf) bufs;
 } http_server_buf;
 
 /**
@@ -84,7 +85,7 @@ typedef struct http_server_response
     // Owner. Could be NULL in case the response is not tied to
     // a particular client.
     struct http_server_client * client;
-    STAILQ_HEAD(slisthead2, http_server_buf) buffer;
+    TAILQ_HEAD(slisthead2, http_server_buf) buffer;
 } http_server_response;
 
 struct http_server;

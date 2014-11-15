@@ -97,14 +97,14 @@ int on_message_complete(http_server_client * client, void * data)
     r = http_server_response_write_head(res, 200);
     assert(r == HTTP_SERVER_OK);
     r = http_server_response_set_header(res, "Transfer-Encoding", 17, "chunked", 7);
-    for (int i = 0; i < 3; ++i)
+
+    for (int i = 0; i < 1000; ++i)
     {
-        char chunk[128];
-        int len = sprintf(chunk, "Hello world %d\n", i);
+        char chunk[1024];
+        int len = sprintf(chunk, "Hello world %08d\n", i);
         r = http_server_response_write(res, chunk, len);
         assert(r == HTTP_SERVER_OK);
     }
-    
     r = http_server_response_end(res);
     assert(r == HTTP_SERVER_OK);
     return 0;

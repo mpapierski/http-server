@@ -5,6 +5,7 @@
 #include <assert.h>
 #include <sys/socket.h>
 #include <sys/select.h>
+#include <sys/types.h>
 #include <netdb.h>          /* hostent struct, gethostbyname() */
 #include <arpa/inet.h>      /* inet_ntoa() to format IP address */
 #include <netinet/in.h>     /* in_addr structure */
@@ -419,14 +420,24 @@ int http_server_socket_action(http_server * srv, http_server_socket_t socket, in
             fprintf(stderr, "Poll out but no response set in client %d\n", client->sock);
             return HTTP_SERVER_SOCKET_ERROR;
         }
-        struct iovec wvec[128];
         http_server_response * res = client->current_response_;
+        // Use scatter-gather I/O to deliver multiple chunks of data
+        static const int maxiov =
+#if defined(MAXIOV)
+            MAXIOV
+#elif defined(IOV_MAX)
+            IOV_MAX
+#else
+            8192
+#endif
+            ;
+        struct iovec wvec[maxiov];
         http_server_buf * buf;
         int iocnt = 0;
-        STAILQ_FOREACH(buf, &res->buffer, bufs)
+        TAILQ_FOREACH(buf, &res->buffer, bufs)
         {
-            assert(it);
-            if (iocnt >= 128)
+            assert(buf);
+            if (iocnt >= maxiov)
             {
                 break;
             }
@@ -451,22 +462,48 @@ int http_server_socket_action(http_server * srv, http_server_socket_t socket, in
             return HTTP_SERVER_SOCKET_ERROR;
         }
         fprintf(stderr, "Client %d: written %d bytes\n", client->sock, (int)bytes_transferred);
-#if 0
-        memcpy(res->data_, res->data_ + bytes_transferred, bytes_transferred);
-        res->data_ = realloc(res->data_, res->size_ - bytes_transferred);
-        if (!res->data_)
+        // Pop buffers from response
+        iocnt = 0;
+        buf = NULL;
+        TAILQ_FOREACH(buf, &res->buffer, bufs)
         {
-            fprintf(stderr, "memory error!\n");
+            if (iocnt >= maxiov)
+            {
+                break;
+            }
+            if (bytes_transferred >= buf->size)
+            {
+                TAILQ_REMOVE(&res->buffer, buf, bufs);
+                free(buf->mem);
+                bytes_transferred -= buf->size;
+                free(buf);
+            }
+            iocnt++;
+        }
+        // It is possible that writev(2) will not write all data
+        if (bytes_transferred > 0 && !TAILQ_EMPTY(&res->buffer))
+        {
+            // This is probably buggy
+            fprintf(stderr, "truncate first buffer\n");
+            buf = TAILQ_FIRST(&res->buffer);
+            if (bytes_transferred > buf->size)
+            {
+                fprintf(stderr, "there is too much to truncate: %d > %d\n", (int)bytes_transferred, buf->size);
+                return HTTP_SERVER_OK;
+            }
+            // Truncate first buffer
+            assert(bytes_transferred <= buf->size);
+            //memmove(buf->data, buf->data + bytes_transferred, bytes_transferred);
+            buf->data += bytes_transferred;
+            buf->size -= bytes_transferred;
+            assert(buf->size > 0);
+            bytes_transferred = 0;
+        }
+        // Poll again if there is any data left
+        if (!TAILQ_EMPTY(&res->buffer) && srv->socket_func(srv->socket_data, it->sock, HTTP_SERVER_POLL_OUT, it->data) != HTTP_SERVER_OK)
+        {
             return HTTP_SERVER_SOCKET_ERROR;
         }
-        res->size_ -= bytes_transferred;
-        // Polla again if there is any data left
-        fprintf(stderr, "res->size=%d\n", res->size_);
-        if (res->size_ && srv->socket_func(srv->socket_data, it->sock, HTTP_SERVER_POLL_OUT, it->data) != HTTP_SERVER_OK)
-        {
-            return HTTP_SERVER_SOCKET_ERROR;
-        }
-#endif
     }
     return r;
 }

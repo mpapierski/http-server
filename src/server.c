@@ -420,12 +420,20 @@ int http_server_socket_action(http_server * srv, http_server_socket_t socket, in
         }
         // TODO: `res` will be some iterator in future
         http_server_response * res = client->current_response_;
-        int bytes_transferred = write(client->sock, res->data_, res->size_);
+        int bytes_transferred = write(client->sock, res->data_, res->size_ > 1024 ? 1024 : res->size_);
         if (bytes_transferred == -1)
         {
             // Unable to send data?
             int e = errno;
-            fprintf(stderr, "Unable to write data to client %d: %d\n", e, bytes_transferred);
+            fprintf(stderr, "unable to write: %s\n", strerror(e));
+            if (srv->socket_func(srv->socket_data, it->sock, HTTP_SERVER_POLL_REMOVE, it->data) != HTTP_SERVER_OK)
+            {
+                return HTTP_SERVER_SOCKET_ERROR;
+            }
+            close(it->sock);
+            //perror("write");
+            // int e = errno;
+            // fprintf(stderr, "Unable to write data to client %d: %d\n", e, bytes_transferred);
             return HTTP_SERVER_SOCKET_ERROR;
         }
         fprintf(stderr, "Client %d: written %d bytes\n", client->sock, bytes_transferred);
@@ -437,6 +445,12 @@ int http_server_socket_action(http_server * srv, http_server_socket_t socket, in
             return HTTP_SERVER_SOCKET_ERROR;
         }
         res->size_ -= bytes_transferred;
+        // Polla again if there is any data left
+        fprintf(stderr, "res->size=%d\n", res->size_);
+        if (res->size_ && srv->socket_func(srv->socket_data, it->sock, HTTP_SERVER_POLL_OUT, it->data) != HTTP_SERVER_OK)
+        {
+            return HTTP_SERVER_SOCKET_ERROR;
+        }
     }
     return r;
 }

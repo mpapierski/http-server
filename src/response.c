@@ -65,14 +65,10 @@ int http_server_response_end(http_server_response * res)
     // Pop current response and proceed to the next?
     // Add "empty frame" if there is chunked encoding
     return http_server_response_send(res, NULL, 0);
-    //return HTTP_SERVER_OK;
 }
 
-
-int http_server_response_send(http_server_response * res, char * data, int size)
+int http_server_response__flush(http_server_response * res)
 {
-    // Check for headers, do content encoding
-    res->data_ = _add_frame(res->data_, &res->size_, data, size);
     assert(res->data_ && "Unable to allocate memory"); // TODO: return ENOMEM
     assert(res->client);
     assert(res->client->server_);
@@ -81,4 +77,11 @@ int http_server_response_send(http_server_response * res, char * data, int size)
         return HTTP_SERVER_SOCKET_ERROR;
     }
     return HTTP_SERVER_OK;
+}
+
+int http_server_response_send(http_server_response * res, char * data, int size)
+{
+    // Check for headers, do content encoding
+    res->data_ = _add_frame(res->data_, &res->size_, data, size);
+    return http_server_response__flush(res);
 }

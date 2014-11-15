@@ -37,7 +37,7 @@ void destroy_http_context(client_context * context)
 
 void http_perform(uv_poll_t *req, int status, int events)
 {
-    fprintf(stderr, "perform\n");
+    fprintf(stderr, "perform (status=%d)\n", status);
     client_context * ctx = req->data;
     int flags = 0;
     if (events & UV_READABLE)
@@ -50,9 +50,7 @@ void http_perform(uv_poll_t *req, int status, int events)
     }
     assert(flags);
     fprintf(stderr, "execute socket action %d\n", ctx->sockfd);
-    uv_poll_stop(req);
     http_server_socket_action(&srv, ctx->sockfd, flags);
-
 }
 
 int _socket_function(void * clientp, http_server_socket_t sock, int flags, void * socketp)
@@ -95,8 +93,14 @@ int on_message_complete(http_server_client * client, void * data)
     assert(res);
     int r = http_server_response_begin(client, res);
     assert(r == HTTP_SERVER_OK);
-    r = http_server_response_send(res, "Hello world", 11);
-    assert(r == HTTP_SERVER_OK);
+    for (int i = 0; i < 1000; ++i)
+    {
+        char chunk[128];
+        int len = sprintf(chunk, "Hello world %d\n", i);
+        r = http_server_response_send(res, chunk, len);
+        assert(r == HTTP_SERVER_OK);
+    }
+    
     r = http_server_response_end(res);
     assert(r == HTTP_SERVER_OK);
     return 0;
@@ -104,6 +108,7 @@ int on_message_complete(http_server_client * client, void * data)
 
 int main(int argc, char * argv[])
 {
+    signal(SIGPIPE, SIG_IGN);
     loop = uv_default_loop();
     int result;
     http_server_init(&srv);

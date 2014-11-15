@@ -255,6 +255,12 @@ int http_server_response_begin(http_server_client * client, http_server_response
 int http_server_response_end(http_server_response * client);
 
 /**
+ * Start sending the response.
+ * User should not call this directly.
+ */
+int http_server_response__flush(http_server_response * res);
+
+/**
  * Write some data to the responses
  * @param res Response
  * @param data Data

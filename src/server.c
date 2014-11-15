@@ -12,6 +12,7 @@
 #include <unistd.h>
 #include <strings.h>
 #include <errno.h>
+#include <sys/uio.h>
 
 typedef struct
 {
@@ -418,9 +419,22 @@ int http_server_socket_action(http_server * srv, http_server_socket_t socket, in
             fprintf(stderr, "Poll out but no response set in client %d\n", client->sock);
             return HTTP_SERVER_SOCKET_ERROR;
         }
-        // TODO: `res` will be some iterator in future
+        struct iovec wvec[128];
         http_server_response * res = client->current_response_;
-        int bytes_transferred = write(client->sock, res->data_, res->size_ > 1024 ? 1024 : res->size_);
+        http_server_buf * buf;
+        int iocnt = 0;
+        STAILQ_FOREACH(buf, &res->buffer, bufs)
+        {
+            assert(it);
+            if (iocnt >= 128)
+            {
+                break;
+            }
+            wvec[iocnt].iov_base = buf->data;
+            wvec[iocnt].iov_len = buf->size;
+            iocnt++;
+        }
+        ssize_t bytes_transferred = writev(client->sock, wvec, iocnt);
         if (bytes_transferred == -1)
         {
             // Unable to send data?
@@ -436,7 +450,8 @@ int http_server_socket_action(http_server * srv, http_server_socket_t socket, in
             // fprintf(stderr, "Unable to write data to client %d: %d\n", e, bytes_transferred);
             return HTTP_SERVER_SOCKET_ERROR;
         }
-        fprintf(stderr, "Client %d: written %d bytes\n", client->sock, bytes_transferred);
+        fprintf(stderr, "Client %d: written %d bytes\n", client->sock, (int)bytes_transferred);
+#if 0
         memcpy(res->data_, res->data_ + bytes_transferred, bytes_transferred);
         res->data_ = realloc(res->data_, res->size_ - bytes_transferred);
         if (!res->data_)
@@ -451,6 +466,7 @@ int http_server_socket_action(http_server * srv, http_server_socket_t socket, in
         {
             return HTTP_SERVER_SOCKET_ERROR;
         }
+#endif
     }
     return r;
 }

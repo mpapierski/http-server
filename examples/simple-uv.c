@@ -50,6 +50,7 @@ void http_perform(uv_poll_t *req, int status, int events)
     }
     assert(flags);
     fprintf(stderr, "execute socket action %d\n", ctx->sockfd);
+    uv_poll_stop(req);
     http_server_socket_action(&srv, ctx->sockfd, flags);
 }
 
@@ -93,11 +94,14 @@ int on_message_complete(http_server_client * client, void * data)
     assert(res);
     int r = http_server_response_begin(client, res);
     assert(r == HTTP_SERVER_OK);
-    for (int i = 0; i < 1000; ++i)
+    r = http_server_response_write_head(res, 200);
+    assert(r == HTTP_SERVER_OK);
+    r = http_server_response_set_header(res, "Transfer-Encoding", 17, "chunked", 7);
+    for (int i = 0; i < 3; ++i)
     {
         char chunk[128];
         int len = sprintf(chunk, "Hello world %d\n", i);
-        r = http_server_response_send(res, chunk, len);
+        r = http_server_response_write(res, chunk, len);
         assert(r == HTTP_SERVER_OK);
     }
     

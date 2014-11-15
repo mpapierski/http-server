@@ -69,6 +69,13 @@ typedef struct http_server_handler
     void * on_message_complete_data;
 } http_server_handler;
 
+typedef struct http_server_buf
+{
+    char * data;
+    int size;
+    STAILQ_ENTRY(http_server_buf) bufs;
+} http_server_buf;
+
 /**
  * HTTP rresponse object
  */
@@ -77,9 +84,7 @@ typedef struct http_server_response
     // Owner. Could be NULL in case the response is not tied to
     // a particular client.
     struct http_server_client * client;
-    // queued data. this is raw HTTP response
-    char * data_;
-    int size_;
+    STAILQ_HEAD(slisthead2, http_server_buf) buffer;
 } http_server_response;
 
 struct http_server;
@@ -239,6 +244,17 @@ http_server_client * http_server_new_client(http_server * server, http_server_so
  */
 int http_server_perform_client(http_server_client * client, const char * at, size_t size);
 
+// Response API
+#define HTTP_SERVER_ENUM_STATUS_CODES(XX) \
+    XX(200, OK, "OK")
+
+typedef enum
+{
+#define XX(status_code, name, description) HTTP_ ## name = status_code,
+    HTTP_SERVER_ENUM_STATUS_CODES(XX)
+#undef XX
+} http_server_status_code;
+
 /**
  * Creates new response object
  */
@@ -261,11 +277,21 @@ int http_server_response_end(http_server_response * client);
 int http_server_response__flush(http_server_response * res);
 
 /**
+ * Write response header
+ */
+int http_server_response_write_head(http_server_response * res, int status_code);
+
+/**
+ * Sets header in response
+ */
+int http_server_response_set_header(http_server_response * res, char * name, int namelen, char * value, int valuelen);
+
+/**
  * Write some data to the responses
  * @param res Response
  * @param data Data
  * @param size Size
  */
-int http_server_response_send(http_server_response * res, char * data, int size);
+int http_server_response_write(http_server_response * res, char * data, int size);
 
 #endif

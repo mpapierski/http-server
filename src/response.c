@@ -4,45 +4,39 @@
 #include <string.h>
 #include <assert.h>
 
-static char * _add_frame(char * buf, int * buf_size, char * frame_data, int frame_size)
+static int _response_add_buffer(http_server_response * res, char * data, int size)
 {
-    // data = data + frame
-    char frame[1024];
-    int len = sprintf(frame, "%x\r\n%.*s\r\n", frame_size, frame_size, frame_data);
-    char * new_buf = realloc(buf, *buf_size + len);
-    if (!new_buf)
+    http_server_buf * new_buffer = malloc(sizeof(http_server_buf));
+    if (!new_buffer)
     {
-        return NULL;
+        return -1;
     }
-    memcpy(new_buf + *buf_size, frame, len);
-    *buf_size += len;
-    return new_buf;
+    new_buffer->data = malloc(size);
+    if (!new_buffer->data)
+    {
+        free(new_buffer);
+        return -1;
+    }
+    memcpy(new_buffer->data, data, size);
+    new_buffer->size = size;
+    STAILQ_INSERT_TAIL(&res->buffer, new_buffer, bufs);
+    return 0;
 }
 
 http_server_response * http_server_response_new()
 {
-    http_server_response * res = malloc(sizeof(http_server_response));
+    http_server_response * res = malloc(sizeof(http_server_response)); 
     if (!res)
     {
         return 0;
     }
-    res->data_ = malloc(1024);
-    if (!res->data_)
-    {
-        free(res);
-        return 0;
-    }
-    bzero(res->data_, 1024);
-    strcat(res->data_, "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n");
-    res->size_ = strlen(res->data_);
+    STAILQ_INIT(&res->buffer);
     return res;
 }
 
 void http_server_response_free(http_server_response * res)
 {
     assert(res);
-    assert(res->data_);
-    free(res->data_);
     free(res);
 }
 
@@ -64,14 +58,15 @@ int http_server_response_end(http_server_response * res)
     assert(res);
     // Pop current response and proceed to the next?
     // Add "empty frame" if there is chunked encoding
-    return http_server_response_send(res, NULL, 0);
+    return http_server_response_write(res, NULL, 0);
 }
 
 int http_server_response__flush(http_server_response * res)
 {
-    assert(res->data_ && "Unable to allocate memory"); // TODO: return ENOMEM
-    assert(res->client);
-    assert(res->client->server_);
+    if (STAILQ_EMPTY(&res->buffer))
+    {
+        return HTTP_SERVER_OK;
+    }
     if (res->client->server_->socket_func(res->client->server_->socket_data, res->client->sock, HTTP_SERVER_POLL_OUT, res->client->data) != HTTP_SERVER_OK)
     {
         return HTTP_SERVER_SOCKET_ERROR;
@@ -79,9 +74,44 @@ int http_server_response__flush(http_server_response * res)
     return HTTP_SERVER_OK;
 }
 
-int http_server_response_send(http_server_response * res, char * data, int size)
+int http_server_response_write_head(http_server_response * res, int status_code)
 {
-    // Check for headers, do content encoding
-    res->data_ = _add_frame(res->data_, &res->size_, data, size);
+    char head[1024];
+    int head_len = -1;
+#define XX(code, name, description) \
+    case code: \
+        head_len = sprintf(head, "HTTP/1.1 %d %s\r\n", code, description); \
+        break;
+    switch (status_code)
+    {
+    HTTP_SERVER_ENUM_STATUS_CODES(XX)
+    default:
+        assert(!"Unknown status code");
+        break;
+    }
+    assert(head_len != -1);
+    int r = _response_add_buffer(res, head, head_len);
+    assert(r != -1);
+    return HTTP_SERVER_OK;
+#undef XX
+}
+
+int http_server_response_set_header(http_server_response * res, char * name, int namelen, char * value, int valuelen)
+{
+    char header[1024];
+    int header_len = sprintf(header, "%.*s: %.*s\r\n", namelen, name, valuelen, value);
+    int r = _response_add_buffer(res, header, header_len);
+    assert(r == 0);
+    return HTTP_SERVER_OK;
+}
+
+int http_server_response_write(http_server_response * res, char * data, int size)
+{
+    // TODO: Check for headers, do content encoding
+    assert(size < 1024);
+    char frame[1024];
+    int frame_length = sprintf(frame, "%x\r\n%.*s\r\n", size, size, data);
+    int r = _response_add_buffer(res, frame, frame_length);
+    assert(r == 0);
     return http_server_response__flush(res);
 }

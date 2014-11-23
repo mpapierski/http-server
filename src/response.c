@@ -26,13 +26,14 @@ static int _response_add_buffer(http_server_response * res, char * data, int siz
     {
         return -1;
     }
-    new_buffer->mem = new_buffer->data = malloc(size);
+    new_buffer->mem = new_buffer->data = malloc(size + 1);
     if (!new_buffer->data)
     {
         free(new_buffer);
         return -1;
     }
     memcpy(new_buffer->data, data, size);
+    new_buffer->data[size] = '\0';
     new_buffer->size = size;
     TAILQ_INSERT_TAIL(&res->buffer, new_buffer, bufs);
     return 0;

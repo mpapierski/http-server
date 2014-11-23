@@ -19,3 +19,11 @@ target_link_libraries (test_errors
     tap)
 add_test (errors
     test_errors)
+
+add_executable (test_response
+    test_response.c)
+target_link_libraries (test_response
+    http_server
+    tap)
+add_test (response
+    test_response)

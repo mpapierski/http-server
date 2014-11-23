@@ -67,11 +67,24 @@ int http_server_perform_client(http_server_client * client, const char * at, siz
 
 int http_server_poll_client(http_server_client * client, int flags)
 {
-    assert(client);
+    if (!client)
+    {
+        return HTTP_SERVER_INVALID_PARAM;
+    }
+    if (!client->server_)
+    {
+        return HTTP_SERVER_INVALID_PARAM;
+    }
+    if (!client->server_->socket_func)
+    {
+        return HTTP_SERVER_INVALID_PARAM;
+    }
     int old_flags = client->current_flags;
     client->current_flags |= flags;
     if (old_flags == client->current_flags)
     {
+        // To save calls to user provided callbacks ignore
+        // a case when I/O poll flags didnt changed.
         return HTTP_SERVER_OK;
     }
     if (client->server_->socket_func(client->server_->socket_data, client->sock, client->current_flags, client->data) != HTTP_SERVER_OK)

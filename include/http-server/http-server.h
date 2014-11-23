@@ -282,6 +282,11 @@ typedef enum
 http_server_response * http_server_response_new();
 
 /**
+ * Free response and all associated
+ */
+void http_server_response_free(http_server_response * res);
+
+/**
  * Queues response to the client.
  */
 int http_server_response_begin(http_server_client * client, http_server_response * res);

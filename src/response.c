@@ -55,12 +55,34 @@ http_server_response * http_server_response_new()
     {
         return 0;
     }
+    res->client = NULL;
     return res;
 }
 
 void http_server_response_free(http_server_response * res)
 {
-    assert(res);
+    if (res == 0)
+    {
+        return;
+    }
+    // Free queued buffers
+    http_server_buf * buf;
+    TAILQ_FOREACH(buf, &res->buffer, bufs)
+    {
+        assert(buf);
+        TAILQ_REMOVE(&res->buffer, buf, bufs);
+        free(buf->mem);
+        free(buf);
+    }
+    // Free headers
+    struct http_server_header * header;
+    TAILQ_FOREACH(header, &res->headers, headers)
+    {
+        TAILQ_REMOVE(&res->headers, header, headers);
+        free(header->key);
+        free(header->value);
+        free(header);
+    }
     free(res);
 }
 
@@ -91,11 +113,7 @@ int http_server_response__flush(http_server_response * res)
     {
         return HTTP_SERVER_OK;
     }
-    if (res->client->server_->socket_func(res->client->server_->socket_data, res->client->sock, HTTP_SERVER_POLL_OUT, res->client->data) != HTTP_SERVER_OK)
-    {
-        return HTTP_SERVER_SOCKET_ERROR;
-    }
-    return HTTP_SERVER_OK;
+    return http_server_poll_client(res->client, HTTP_SERVER_POLL_OUT);
 }
 
 int http_server_response_write_head(http_server_response * res, int status_code)

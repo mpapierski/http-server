@@ -375,6 +375,10 @@ int http_server_socket_action(http_server * srv, http_server_socket_t socket, in
     {
         return HTTP_SERVER_INVALID_PARAM;
     }
+    if ((client->current_flags & flags) != 0)
+    {
+        client->current_flags ^= flags;
+    }
     if (flags & HTTP_SERVER_POLL_IN)
     {
         // Read data
@@ -392,7 +396,7 @@ int http_server_socket_action(http_server * srv, http_server_socket_t socket, in
                 return HTTP_SERVER_SOCKET_ERROR;
             }
             r = HTTP_SERVER_CLIENT_EOF;
-            if (srv->socket_func(srv->socket_data, it->sock, HTTP_SERVER_POLL_REMOVE, it->data) != HTTP_SERVER_OK)
+            if (http_server_poll_client(it, HTTP_SERVER_POLL_REMOVE) != HTTP_SERVER_OK)
             {
                 return HTTP_SERVER_SOCKET_ERROR;
             }
@@ -404,12 +408,18 @@ int http_server_socket_action(http_server * srv, http_server_socket_t socket, in
             if (http_server_perform_client(client, tmp, bytes_received) != HTTP_SERVER_OK)
             {
                 // TODO: close connection for now but this should be something like 400 BAD REQUEST.
-                if (srv->socket_func(srv->socket_data, it->sock, HTTP_SERVER_POLL_REMOVE, it->data) != HTTP_SERVER_OK)
+                if (http_server_poll_client(it, HTTP_SERVER_POLL_REMOVE) != HTTP_SERVER_OK)
                 {
                     return HTTP_SERVER_SOCKET_ERROR;
                 }
                 close(it->sock);
                 return r;
+            }
+            fprintf(stderr, "is_complete: %d\n", it->is_complete);
+            if (!it->is_complete && http_server_poll_client(it, HTTP_SERVER_POLL_IN) != HTTP_SERVER_OK)
+            {
+                fprintf(stderr, "unable to poll in - request incomplete\n");
+                return HTTP_SERVER_SOCKET_ERROR;
             }
         }
     }
@@ -451,7 +461,7 @@ int http_server_socket_action(http_server * srv, http_server_socket_t socket, in
             // Unable to send data?
             int e = errno;
             fprintf(stderr, "unable to write: %s\n", strerror(e));
-            if (srv->socket_func(srv->socket_data, it->sock, HTTP_SERVER_POLL_REMOVE, it->data) != HTTP_SERVER_OK)
+            if (http_server_poll_client(it, HTTP_SERVER_POLL_REMOVE) != HTTP_SERVER_OK)
             {
                 return HTTP_SERVER_SOCKET_ERROR;
             }
@@ -500,7 +510,7 @@ int http_server_socket_action(http_server * srv, http_server_socket_t socket, in
             bytes_transferred = 0;
         }
         // Poll again if there is any data left
-        if (!TAILQ_EMPTY(&res->buffer) && srv->socket_func(srv->socket_data, it->sock, HTTP_SERVER_POLL_OUT, it->data) != HTTP_SERVER_OK)
+        if (!TAILQ_EMPTY(&res->buffer) && http_server_poll_client(it, HTTP_SERVER_POLL_OUT) != HTTP_SERVER_OK)
         {
             return HTTP_SERVER_SOCKET_ERROR;
         }

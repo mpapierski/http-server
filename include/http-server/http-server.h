@@ -104,6 +104,8 @@ typedef struct http_server_client
     http_server_handler * handler_;
     http_server_response * current_response_;
     struct http_server * server_;
+    int current_flags; // current I/O poll flags
+    int is_complete; // request is complete
 } http_server_client;
 
 typedef struct http_server
@@ -244,6 +246,12 @@ http_server_client * http_server_new_client(http_server * server, http_server_so
  * Feeds client using chunk of datad    
  */
 int http_server_perform_client(http_server_client * client, const char * at, size_t size);
+
+/**
+ * Calls for I/O poll on a client
+ * @private
+ */
+int http_server_poll_client(http_server_client * client, int flags);
 
 // Response API
 #define HTTP_SERVER_ENUM_STATUS_CODES(XX) \

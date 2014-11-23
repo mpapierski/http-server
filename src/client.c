@@ -15,7 +15,9 @@ static int my_message_complete_callback(http_parser * parser)
 {
     http_server_client * client = parser->data;
     fprintf(stderr, "message complete\n");
-    return client->handler_->on_message_complete(client, client->handler_->on_message_complete_data);
+    int rv = client->handler_->on_message_complete(client, client->handler_->on_message_complete_data);
+    client->is_complete = 1;
+    return rv;
 }
 
 
@@ -44,6 +46,8 @@ http_server_client * http_server_new_client(http_server * server, http_server_so
     // Response should be NULL so we know when to poll for WRITE
     client->current_response_ = NULL;
     client->server_ = server;
+    client->current_flags = 0;
+    client->is_complete = 0;
     return client;
 }
 
@@ -57,6 +61,22 @@ int http_server_perform_client(http_server_client * client, const char * at, siz
         // Error
         fprintf(stderr, "unable to execute parser %d/%d\n", (int)nparsed, (int)size);
         return HTTP_SERVER_PARSER_ERROR;
+    }
+    return HTTP_SERVER_OK;
+}
+
+int http_server_poll_client(http_server_client * client, int flags)
+{
+    assert(client);
+    int old_flags = client->current_flags;
+    client->current_flags |= flags;
+    if (old_flags == client->current_flags)
+    {
+        return HTTP_SERVER_OK;
+    }
+    if (client->server_->socket_func(client->server_->socket_data, client->sock, client->current_flags, client->data) != HTTP_SERVER_OK)
+    {
+        return HTTP_SERVER_SOCKET_ERROR;
     }
     return HTTP_SERVER_OK;
 }

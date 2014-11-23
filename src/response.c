@@ -230,6 +230,11 @@ int http_server_response_write(http_server_response * res, char * data, int size
     else
     {
         // User most probably set 'content-length' so the data is 'raw'
+        if (!data || size == 0)
+        {
+            // Do nothing - called once will create empty response.
+            return http_server_response__flush(res);
+        }
         int r = _response_add_buffer(res, data, size);
         assert(r == 0);
     }

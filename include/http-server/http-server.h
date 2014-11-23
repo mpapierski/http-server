@@ -77,6 +77,15 @@ typedef struct http_server_buf
     TAILQ_ENTRY(http_server_buf) bufs;
 } http_server_buf;
 
+struct http_server_header
+{
+    TAILQ_ENTRY(http_server_header) headers;
+    char * key;
+    int key_size;
+    char * value;
+    int value_size;
+};
+
 /**
  * HTTP rresponse object
  */
@@ -86,6 +95,9 @@ typedef struct http_server_response
     // a particular client.
     struct http_server_client * client;
     TAILQ_HEAD(slisthead2, http_server_buf) buffer;
+    int headers_sent; // are headers sent yet?
+    TAILQ_HEAD(http_server_headers, http_server_header) headers;
+    int is_chunked;
 } http_server_response;
 
 struct http_server;

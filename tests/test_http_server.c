@@ -21,6 +21,13 @@ static http_server_socket_t _opensocket_function(void * arg)
     return s;
 }
 
+static int _closesocket_function(http_server_socket_t sock, void * arg)
+{
+    int result = close(sock);
+    cmp_ok(result, "!=", -1, "close tcp socket");
+    return HTTP_SERVER_OK;
+}
+
 static int _socket_function(void * clientp, http_server_socket_t sock, int flags, void * socketp)
 {
     return HTTP_SERVER_OK;
@@ -29,19 +36,29 @@ static int _socket_function(void * clientp, http_server_socket_t sock, int flags
 void test_setopt()
 {
     int r;
-    int data = 42;
+    int opensocket_data = 42;
+    int closesocket_data = 43;
+    int socket_data = 44;
 
-    r = http_server_setopt(&srv, HTTP_SERVER_OPT_OPEN_SOCKET_DATA, &data);
+    r = http_server_setopt(&srv, HTTP_SERVER_OPT_OPEN_SOCKET_DATA, &opensocket_data);
     ok(r == HTTP_SERVER_OK, "setopt (pointer) result %d (expected %d)", r, HTTP_SERVER_OK);
-    ok(srv.opensocket_data == &data, "setopt (open socket data) is correct");
+    ok(srv.opensocket_data == &opensocket_data, "setopt (open socket data) is correct");
     
     r = http_server_setopt(&srv, HTTP_SERVER_OPT_OPEN_SOCKET_FUNCTION, &_opensocket_function);
     ok(r == HTTP_SERVER_OK, "setopt (function) result %d (expected %d)", r, HTTP_SERVER_OK);
     ok(srv.opensocket_func == &_opensocket_function, "setopt (open socket function) is correct");
 
-    r = http_server_setopt(&srv, HTTP_SERVER_OPT_SOCKET_DATA, &data);
+    r = http_server_setopt(&srv, HTTP_SERVER_OPT_CLOSE_SOCKET_DATA, &closesocket_data);
     ok(r == HTTP_SERVER_OK, "setopt (pointer) result %d (expected %d)", r, HTTP_SERVER_OK);
-    ok(srv.socket_data == &data, "setopt (socket data) is correct");
+    ok(srv.closesocket_data == &closesocket_data, "setopt (open socket data) is correct");
+
+    r = http_server_setopt(&srv, HTTP_SERVER_OPT_CLOSE_SOCKET_FUNCTION, &_closesocket_function);
+    ok(r == HTTP_SERVER_OK, "setopt (function) result %d (expected %d)", r, HTTP_SERVER_OK);
+    ok(srv.opensocket_func == &_opensocket_function, "setopt (open socket function) is correct");
+
+    r = http_server_setopt(&srv, HTTP_SERVER_OPT_SOCKET_DATA, &socket_data);
+    ok(r == HTTP_SERVER_OK, "setopt (pointer) result %d (expected %d)", r, HTTP_SERVER_OK);
+    ok(srv.socket_data == &socket_data, "setopt (socket data) is correct");
     
     r = http_server_setopt(&srv, HTTP_SERVER_OPT_SOCKET_FUNCTION, &_socket_function);
     ok(r == HTTP_SERVER_OK, "setopt (function) result %d (expected %d)", r, HTTP_SERVER_OK);

@@ -41,6 +41,12 @@ typedef enum {
 typedef http_server_socket_t (*http_server_opensocket_callback)(void * clientp);
 
 /**
+ * Callback that will be called whenever http-server stops using
+ * a socket. Typically this should call close(2).
+ */
+typedef int (*http_server_closesocket_callback)(http_server_socket_t sock, void * clientp);
+
+/**
  * Called when http-server requests some poll.
  * @param clientp Client pointer
  * @param sock Socket
@@ -139,6 +145,15 @@ typedef struct http_server
      * Custom data pointer that user provides.
      */
     void * opensocket_data;
+    /**
+     * Callback that will be called whenever http-server decides
+     * to close a socket.
+     */
+    http_server_closesocket_callback closesocket_func;
+    /**
+     * Custom data pointer that user provides for close socket callback.
+     */
+    void * closesocket_data;
     /**
      * Called when http-server internals wants some async action
      */

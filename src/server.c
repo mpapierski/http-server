@@ -69,6 +69,15 @@ static int _default_opensocket_function(void * clientp)
     return s;
 }
 
+int _default_closesocket_function(http_server_socket_t sock, void * clientp)
+{
+    if (close(sock) == -1)
+    {
+        perror("close");
+    }
+    return HTTP_SERVER_OK;
+}
+
 static int _default_socket_function(void * clientp, http_server_socket_t sock, int flags, void * socketp)
 {
     // Data assigned to listening socket is a `fd_set` 
@@ -118,6 +127,8 @@ int http_server_init(http_server * srv)
     srv->sock_listen_data = ev;
     srv->opensocket_func = &_default_opensocket_function;
     srv->opensocket_data = srv;
+    srv->closesocket_func = &_default_closesocket_function;
+    srv->closesocket_data = srv;
     srv->socket_func = &_default_socket_function;
     srv->handler_ = NULL;
 
@@ -146,6 +157,11 @@ int http_server_setopt(http_server * srv, http_server_option opt, ...)
             srv->opensocket_data = ptr;
             fprintf(stderr, "set opensocket data %p\n", ptr);
         }
+        if (opt == HTTP_SERVER_OPT_CLOSE_SOCKET_DATA)
+        {
+            srv->closesocket_data = ptr;
+            fprintf(stderr, "set close socket func data %p\n", ptr);
+        }
         if (opt == HTTP_SERVER_OPT_SOCKET_DATA)
         {
             srv->socket_data = ptr;
@@ -169,6 +185,11 @@ int http_server_setopt(http_server * srv, http_server_option opt, ...)
         {
             srv->opensocket_func = va_arg(ap, http_server_opensocket_callback);
             fprintf(stderr, "set opensocket func\n");
+        }
+        if (opt == HTTP_SERVER_OPT_CLOSE_SOCKET_FUNCTION)
+        {
+            srv->closesocket_func = va_arg(ap, http_server_closesocket_callback);
+            fprintf(stderr, "set closesocket func\n");
         }
         if (opt == HTTP_SERVER_OPT_SOCKET_FUNCTION)
         {

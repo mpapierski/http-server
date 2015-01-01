@@ -481,6 +481,7 @@ int http_server_socket_action(http_server * srv, http_server_socket_t socket, in
             return HTTP_SERVER_SOCKET_ERROR;
         }
         http_server_response * res = client->current_response_;
+        assert(!TAILQ_EMPTY(&res->buffer));
         // Use scatter-gather I/O to deliver multiple chunks of data
         static const int maxiov =
 #if defined(MAXIOV)
@@ -565,6 +566,12 @@ int http_server_socket_action(http_server * srv, http_server_socket_t socket, in
         // Poll again if there is any data left
         if (!TAILQ_EMPTY(&res->buffer) && http_server_poll_client(it, HTTP_SERVER_POLL_OUT) != HTTP_SERVER_OK)
         {
+            return HTTP_SERVER_SOCKET_ERROR;
+        }
+        // All response is sent. Poll again for new request
+        if (http_server_poll_client(it, HTTP_SERVER_POLL_IN) != HTTP_SERVER_OK)
+        {
+            fprintf(stderr, "unable to poll in for next request on client %d\n", it->sock);
             return HTTP_SERVER_SOCKET_ERROR;
         }
     }

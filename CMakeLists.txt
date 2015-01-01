@@ -1,5 +1,5 @@
 cmake_minimum_required (VERSION 2.6)
-project (http_server C)
+project (http_server C CXX)
 
 option (HTTP_SERVER_TESTS "Build http-server tests" OFF)
 option (HTTP_SERVER_EXAMPLES "Build http-server examples" OFF)

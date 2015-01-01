@@ -373,7 +373,23 @@ int http_server_socket_action(http_server * srv, http_server_socket_t socket, in
     }
     if (!client)
     {
-        return HTTP_SERVER_INVALID_PARAM;
+        // Socket not found in managed list of clients.
+        // Some event loops does accept(2) for you,
+        // so in this case calling `http_server_socket_action`
+        // with newly accepted client is fine.
+        if (http_server_add_client(srv, socket) != HTTP_SERVER_OK)
+        {
+            // If we can't manage this socket then disconnect it.
+            close(socket);
+            return HTTP_SERVER_SOCKET_ERROR;
+        }
+        if (srv->socket_func(srv->socket_data, srv->sock_listen, HTTP_SERVER_POLL_IN, srv->sock_listen_data) != HTTP_SERVER_OK)
+        {
+            (void)http_server_pop_client(srv, socket);
+            close(socket);
+            return HTTP_SERVER_SOCKET_ERROR;
+        }
+        return HTTP_SERVER_OK;
     }
     if ((client->current_flags & flags) != 0)
     {

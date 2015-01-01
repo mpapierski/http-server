@@ -8,14 +8,14 @@ static int my_url_callback(http_parser * parser, const char * at, size_t length)
 {
     http_server_client * client = parser->data;
     fprintf(stderr, "url chunk: %.*s\n", (int)length, at);
-    return client->handler_->on_url(client, client->handler_->on_url_data, at, length);
+    return client->handler->on_url(client, client->handler->on_url_data, at, length);
 }
 
 static int my_message_complete_callback(http_parser * parser)
 {
     http_server_client * client = parser->data;
     fprintf(stderr, "message complete\n");
-    int rv = client->handler_->on_message_complete(client, client->handler_->on_message_complete_data);
+    int rv = client->handler->on_message_complete(client, client->handler->on_message_complete_data);
     client->is_complete = 1;
     return rv;
 }
@@ -34,7 +34,7 @@ http_server_client * http_server_new_client(http_server * server, http_server_so
     http_server_client * client = malloc(sizeof(http_server_client));
     client->sock = sock;
     client->data = NULL;
-    client->handler_ = handler;
+    client->handler = handler;
     // Initialize http parser stuff
     bzero(&client->parser_settings_, sizeof(client->parser_settings_));
     // Request

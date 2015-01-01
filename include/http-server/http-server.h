@@ -104,6 +104,7 @@ typedef struct http_server_response
     int headers_sent; // are headers sent yet?
     TAILQ_HEAD(http_server_headers, http_server_header) headers;
     int is_chunked;
+    int is_done; // is response done?
 } http_server_response;
 
 struct http_server;
@@ -119,7 +120,7 @@ typedef struct http_server_client
     // private:
     http_parser_settings parser_settings_;
     http_parser parser_; // private
-    http_server_handler * handler_;
+    http_server_handler * handler;
     http_server_response * current_response_;
     struct http_server * server_;
     int current_flags; // current I/O poll flags

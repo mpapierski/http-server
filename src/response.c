@@ -57,6 +57,7 @@ http_server_response * http_server_response_new()
         return 0;
     }
     res->client = NULL;
+    res->is_done = 0;
     return res;
 }
 
@@ -103,6 +104,9 @@ int http_server_response_begin(http_server_client * client, http_server_response
 int http_server_response_end(http_server_response * res)
 {
     assert(res);
+    // Mark the response as "finished" so we can know when to proceed
+    // to the next request.
+    res->is_done = 1;
     // Pop current response and proceed to the next?
     // Add "empty frame" if there is chunked encoding
     return http_server_response_write(res, NULL, 0);

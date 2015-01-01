@@ -2,6 +2,8 @@
 #include <boost/asio.hpp>
 #include <boost/bind.hpp>
 #include <boost/lexical_cast.hpp>
+#include <boost/shared_ptr.hpp>
+#include <boost/make_shared.hpp>
 
 extern "C" {
 #include "http-server/http-server.h"
@@ -260,21 +262,42 @@ private:
     }
     static int on_message_complete(http_server_client * client, void * data)
     {
+        return static_cast<http_server_service *>(client->handler->data)->handle_message(client, data);
+    }
+    int handle_message(http_server_client * client, void * data)
+    {
         http_server_request * req = static_cast<http_server_request *>(client->data);
+
         // Write response
         http_server_response * res = http_server_response_new();
         
+
         int result = http_server_response_begin(client, res);
         if (result != HTTP_SERVER_OK)
         {
             throw boost::system::system_error(result, get_http_error_category(), "http_server_response_begin");   
         }
-
         // Start response by writing header
         result = http_server_response_write_head(res, 200);
         if (result != HTTP_SERVER_OK)
         {
             throw boost::system::system_error(result, get_http_error_category(), "http_server_response_write_head");   
+        }
+        // Send streaming response
+        if (req->url == "/stream/")
+        {
+            boost::shared_ptr<boost::asio::deadline_timer> timer =
+                boost::make_shared<boost::asio::deadline_timer>(boost::ref(get_io_service()));
+            timer->expires_from_now(boost::posix_time::seconds(1));
+            timer->async_wait(
+                boost::bind(&http_server_service::stream_response, this,
+                    boost::asio::placeholders::error,
+                    client,
+                    data,
+                    res,
+                    0,
+                    timer));
+            return 0;
         }
         // Send message
         char chunk[1024];
@@ -299,6 +322,42 @@ private:
         delete req;
         client->data = NULL;
         return 0;
+    }
+    void stream_response(const boost::system::error_code & ec,
+        http_server_client * client,
+        void * data,
+        http_server_response * res,
+        int counter,
+        boost::shared_ptr<boost::asio::deadline_timer> timer)
+    {
+        if (ec)
+        {
+            fprintf(stderr, "stream response fail %s\n", ec.message().c_str());
+            return;
+        }
+        ++counter;
+        if (counter > 10)
+        {
+            http_server_response_end(res);
+            //delete req;
+            client->data = NULL;
+            return;
+        }
+        else
+        {
+            char chunk[1024];
+            int length = sprintf(chunk, "Hello world!\n");
+            http_server_response_write(res, chunk, length);
+        }
+        timer->expires_from_now(boost::posix_time::seconds(1));
+        timer->async_wait(
+            boost::bind(&http_server_service::stream_response, this,
+                boost::asio::placeholders::error,
+                client,
+                data,
+                res,
+                counter,
+                timer));
     }
     http_server srv_;
     http_server_handler handler_;

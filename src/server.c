@@ -568,6 +568,11 @@ int http_server_socket_action(http_server * srv, http_server_socket_t socket, in
         {
             return HTTP_SERVER_SOCKET_ERROR;
         }
+        // All response data is sent now. No need to hold this memory,
+        // and allow next requests inside the same connection to create
+        // new responses.
+        http_server_response_free(res);
+        it->current_response_ = NULL;
         // All response is sent. Poll again for new request
         if (http_server_poll_client(it, HTTP_SERVER_POLL_IN) != HTTP_SERVER_OK)
         {

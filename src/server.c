@@ -257,7 +257,10 @@ int http_server_run(http_server * srv)
                 {
                     fprintf(stderr, "failed to do socket action on fd=%d\n", it->sock);
                     FD_CLR(it->sock, &ev->rdset);
-                    close(it->sock);
+                    if (srv->closesocket_func(it->sock, srv->closesocket_data) != HTTP_SERVER_OK)
+                    {
+                        return HTTP_SERVER_SOCKET_ERROR;
+                    }
                     http_server_pop_client(srv, it->sock);
                 }
             }
@@ -341,7 +344,10 @@ int http_server_pop_client(http_server * srv, http_server_socket_t sock)
         {
             SLIST_REMOVE(&srv->clients, it, http_server_client, next);
             // TODO: close socket callback
-            close(it->sock);
+            if (srv->closesocket_func(it->sock, srv->closesocket_data) != HTTP_SERVER_OK)
+            {
+                return HTTP_SERVER_SOCKET_ERROR;
+            }
             free(it);
             r = HTTP_SERVER_OK;
             break;
@@ -449,7 +455,10 @@ int http_server_socket_action(http_server * srv, http_server_socket_t socket, in
                 {
                     return HTTP_SERVER_SOCKET_ERROR;
                 }
-                close(it->sock);
+                if (srv->closesocket_func(it->sock, srv->closesocket_data) != HTTP_SERVER_OK)
+                {
+                    return HTTP_SERVER_SOCKET_ERROR;
+                }
                 return r;
             }
             fprintf(stderr, "is_complete: %d\n", it->is_complete);
@@ -502,7 +511,10 @@ int http_server_socket_action(http_server * srv, http_server_socket_t socket, in
             {
                 return HTTP_SERVER_SOCKET_ERROR;
             }
-            close(it->sock);
+            if (srv->closesocket_func(it->sock, srv->closesocket_data) != HTTP_SERVER_OK)
+            {
+                return HTTP_SERVER_SOCKET_ERROR;
+            }
             //perror("write");
             // int e = errno;
             // fprintf(stderr, "Unable to write data to client %d: %d\n", e, bytes_transferred);

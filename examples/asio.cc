@@ -345,9 +345,7 @@ private:
         }
         else
         {
-            char chunk[1024];
-            int length = sprintf(chunk, "Hello world!\n");
-            http_server_response_write(res, chunk, length);
+            http_server_response_printf(res, "Hello world %d!\n", counter);
         }
         timer->expires_from_now(boost::posix_time::seconds(1));
         timer->async_wait(

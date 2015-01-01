@@ -375,4 +375,10 @@ int http_server_response_set_header(http_server_response * res, char * name, int
  */
 int http_server_response_write(http_server_response * res, char * data, int size);
 
+/**
+ * Write some data to the response similiar to a printf(3) call.
+ */
+int http_server_response_printf(http_server_response * res, const char * format, ...);
+
+
 #endif

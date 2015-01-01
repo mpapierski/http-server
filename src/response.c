@@ -4,6 +4,8 @@
 #include <string.h>
 #include <assert.h>
 #include <ctype.h>
+#include <stdarg.h>
+
 static int http_server_header_cmp(struct http_server_header * lhs, struct http_server_header * rhs)
 {
     char * a = lhs->key;
@@ -243,4 +245,17 @@ int http_server_response_write(http_server_response * res, char * data, int size
         assert(r == 0);
     }
     return http_server_response__flush(res);
+}
+
+int http_server_response_printf(http_server_response * res, const char * format, ...)
+{
+    va_list args;
+    va_start(args, format);
+    char * buffer = NULL;
+    int result = vasprintf(&buffer, format, args);
+    assert(buffer);
+    int r = http_server_response_write(res, buffer, result);
+    free(buffer);
+    va_end(args);
+    return r;
 }

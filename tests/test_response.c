@@ -155,6 +155,7 @@ int main(int argc, char * argv[])
     cmp_ok(res->headers_sent, "==", 0);
     http_server_response_write_head(res, 200);
     http_server_response_write(res, "Hello world!", 12);
+    http_server_response_printf(res, "Hello world %d!", 1234);
     // headers are fluhsed
     cmp_ok(res->headers_sent, "==", 1);
     ok(TAILQ_EMPTY(&res->headers));
@@ -171,6 +172,9 @@ int main(int argc, char * argv[])
     buf = TAILQ_NEXT(buf, bufs);
     ok(!!buf);
     is(buf->data, "Hello world!");
+    buf = TAILQ_NEXT(buf, bufs);
+    ok(!!buf);
+    is(buf->data, "Hello world 1234!");
     buf = TAILQ_NEXT(buf, bufs);
     ok(!buf);
     // all done

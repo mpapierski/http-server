@@ -52,6 +52,16 @@ public:
         {
             throw boost::system::system_error(result, get_http_error_category(), "http_server_setopt");
         }
+        result = http_server_setopt(&srv_, HTTP_SERVER_OPT_CLOSE_SOCKET_DATA, this);
+        if (result != HTTP_SERVER_OK)
+        {
+            throw boost::system::system_error(result, get_http_error_category(), "http_server_setopt");
+        }
+        result = http_server_setopt(&srv_, HTTP_SERVER_OPT_CLOSE_SOCKET_FUNCTION, &closesocket_function);
+        if (result != HTTP_SERVER_OK)
+        {
+            throw boost::system::system_error(result, get_http_error_category(), "http_server_setopt");
+        }
 
         result = http_server_setopt(&srv_, HTTP_SERVER_OPT_SOCKET_DATA, this);
         if (result != HTTP_SERVER_OK)
@@ -104,6 +114,30 @@ private:
         svc->acceptors_.insert(std::make_pair(static_cast<http_server_socket_t>(acceptor->native_handle()), acceptor));
         return acceptor->native_handle();
     }
+    static int closesocket_function(http_server_socket_t socket, void * clientp)
+    {
+        http_server_service * svc = static_cast<http_server_service *>(clientp);
+        http_server_service::acceptors_t::iterator it = svc->acceptors_.find(socket);
+        if (it != svc->acceptors_.end())
+        {
+            fprintf(stderr, "erase asio acceptor socket %d\n", it->first);
+            it->second->cancel();
+            delete it->second;
+            svc->acceptors_.erase(it);
+            return HTTP_SERVER_OK;
+        }
+        http_server_service::sockets_t::iterator it2 = svc->sockets_.find(socket);
+        if (it2 != svc->sockets_.end())
+        {
+            fprintf(stderr, "erase asio client socket %d\n", it2->first);
+            it2->second->cancel();
+            delete it2->second;
+            svc->sockets_.erase(it2);
+            return HTTP_SERVER_OK;
+        }
+        fprintf(stderr, "close socket invalid socket: %d\n", socket);
+        return HTTP_SERVER_INVALID_SOCKET;
+    }
     static int socket_function(void * clientp, http_server_socket_t sock, int flags, void * socketp)
     {
         http_server_service * svc = static_cast<http_server_service *>(clientp);
@@ -120,13 +154,18 @@ private:
                     new_socket));
             return 0;
         }
-        fprintf(stderr, "clientp=%p sock=%d flags=%d socketp=%p", clientp, sock, flags, socketp);
+        fprintf(stderr, "clientp=%p sock=%d flags=%d socketp=%p\n", clientp, sock, flags, socketp);
         http_server_service::sockets_t::iterator it2 = svc->sockets_.find(sock);
         if (it2 == svc->sockets_.end())
         {
             fprintf(stderr, "socket %d not found!\n", sock);
-            abort();
+            //abort();
             return 0;
+        }
+        if (flags & HTTP_SERVER_POLL_REMOVE)
+        {
+            fprintf(stderr, "cancel asio socket %d\n", sock);
+            it2->second->cancel();
         }
         if (flags & HTTP_SERVER_POLL_IN)
         {
@@ -136,7 +175,7 @@ private:
                     boost::asio::placeholders::bytes_transferred,
                     it2->second));
         }
-        if (flags & HTTP_SERVER_POLL_IN)
+        if (flags & HTTP_SERVER_POLL_OUT)
         {
             it2->second->async_write_some(boost::asio::null_buffers(),
                 boost::bind(&http_server_service::handle_write, svc,

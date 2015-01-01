@@ -438,12 +438,16 @@ int http_server_socket_action(http_server * srv, http_server_socket_t socket, in
             {
                 return HTTP_SERVER_SOCKET_ERROR;
             }
-            r = HTTP_SERVER_CLIENT_EOF;
             if (http_server_poll_client(it, HTTP_SERVER_POLL_REMOVE) != HTTP_SERVER_OK)
             {
                 return HTTP_SERVER_SOCKET_ERROR;
             }
-            return r;
+            if (srv->closesocket_func(it->sock, srv->closesocket_data) != HTTP_SERVER_OK)
+            {
+                return HTTP_SERVER_SOCKET_ERROR;
+            }
+            http_server_pop_client(srv, it->sock);
+            return HTTP_SERVER_OK;
         }
         else
         {

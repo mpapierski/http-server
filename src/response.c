@@ -93,7 +93,7 @@ int http_server_response_begin(http_server_client * client, http_server_response
     assert(!client->current_response_);
     res->client = client;
     client->current_response_ = res;
-    if (client->server_->socket_func(client->server_->socket_data, client->sock, HTTP_SERVER_POLL_OUT, client->data) != HTTP_SERVER_OK)
+    if (http_server_poll_client(client, HTTP_SERVER_POLL_OUT) != HTTP_SERVER_OK)
     {
         return HTTP_SERVER_SOCKET_ERROR;
     }

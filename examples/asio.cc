@@ -28,6 +28,11 @@ inline boost::system::error_category & get_http_error_category()
     return category;
 }
 
+struct http_server_request
+{
+    std::string url;
+};
+
 class http_server_service
     : public boost::asio::io_service::service
 {
@@ -75,7 +80,9 @@ public:
         }
         // Prepare handler object
         handler_.on_url = &on_url;
+        handler_.on_url_data = this;
         handler_.on_message_complete = &on_message_complete;
+        handler_.on_message_complete_data = this;
 
         result = http_server_setopt(&srv_, HTTP_SERVER_OPT_HANDLER, &handler_);
         if (result != HTTP_SERVER_OK)
@@ -241,11 +248,19 @@ private:
     }
     static int on_url(http_server_client * client, void * data, const char * buf, size_t size)
     {
-        fprintf(stderr, "URL chunk: %.*s\n", (int)size, buf);
+        assert(data);
+        if (!client->data)
+        {
+            client->data = new http_server_request;
+        }
+        http_server_service * svc = static_cast<http_server_service *>(data);
+        static_cast<http_server_request *>(client->data)->url.append(buf, size);
+        //fprintf(stderr, "URL chunk: %.*s\n", (int)size, buf);
         return 0;
     }
     static int on_message_complete(http_server_client * client, void * data)
     {
+        http_server_request * req = static_cast<http_server_request *>(client->data);
         // Write response
         http_server_response * res = http_server_response_new();
         
@@ -269,12 +284,20 @@ private:
         {
             throw boost::system::system_error(result, get_http_error_category(), "http_server_response_write");   
         }
+        length = sprintf(chunk, "URL: %s!\n", req->url.c_str());
+        result = http_server_response_write(res, chunk, length);
+        if (result != HTTP_SERVER_OK)
+        {
+            throw boost::system::system_error(result, get_http_error_category(), "http_server_response_write");   
+        }
         // Finish response
         result = http_server_response_end(res);
         if (result != HTTP_SERVER_OK)
         {
             throw boost::system::system_error(result, get_http_error_category(), "http_server_response_end");   
         }
+        delete req;
+        client->data = NULL;
         return 0;
     }
     http_server srv_;

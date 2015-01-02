@@ -52,7 +52,7 @@ static int Http_server_select_event_loop_init(http_server * srv)
     srv->closesocket_data = srv;
     srv->socket_func = &_default_socket_function;
 
-	return 0;
+    return 0;
 }
 
 static void Http_server_select_event_loop_free(http_server * srv)
@@ -147,7 +147,7 @@ static int _default_socket_function(void * clientp, http_server_socket_t sock, i
 
 static int Http_server_select_event_loop_run(http_server * srv)
 {
-	int r;
+    int r;
     Http_server_event_handler * ev = srv->sock_listen_data;
     do
     {
@@ -214,7 +214,7 @@ static int Http_server_select_event_loop_run(http_server * srv)
 }
 
 struct Http_server_event_loop Http_server_event_loop_select = {
-	.init_fn = &Http_server_select_event_loop_init,
-	.free_fn = &Http_server_select_event_loop_free,
-	.run_fn = &Http_server_select_event_loop_run
+    .init_fn = &Http_server_select_event_loop_init,
+    .free_fn = &Http_server_select_event_loop_free,
+    .run_fn = &Http_server_select_event_loop_run
 };

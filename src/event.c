@@ -7,27 +7,27 @@
 int Http_server_event_loop_init(http_server * srv, const char * name)
 {
 #if defined(HTTP_SERVER_HAVE_SELECT)
-	if (strncmp(name, "select", 6) == 0)
-	{
-		srv->event_loop_ = &Http_server_event_loop_select;
-	}
-	else
+    if (strncmp(name, "select", 6) == 0)
+    {
+        srv->event_loop_ = &Http_server_event_loop_select;
+    }
+    else
 #endif
-	{
-		// Invalid event loop
-		return HTTP_SERVER_INVALID_PARAM;
-	}
-	assert(srv->event_loop_);
-	return ((struct Http_server_event_loop *)srv->event_loop_)->init_fn(srv);
+    {
+        // Invalid event loop
+        return HTTP_SERVER_INVALID_PARAM;
+    }
+    assert(srv->event_loop_);
+    return ((struct Http_server_event_loop *)srv->event_loop_)->init_fn(srv);
 }
 
 void Http_server_event_loop_free(http_server * srv)
 {
-	assert(srv->event_loop_);
-	((struct Http_server_event_loop *)srv->event_loop_)->free_fn(srv);
+    assert(srv->event_loop_);
+    ((struct Http_server_event_loop *)srv->event_loop_)->free_fn(srv);
 }
 
 int Http_server_event_loop_run(http_server * srv)
 {
-	return ((struct Http_server_event_loop *)srv->event_loop_)->run_fn(srv);
+    return ((struct Http_server_event_loop *)srv->event_loop_)->run_fn(srv);
 }

@@ -20,14 +20,8 @@
 
 typedef struct
 {
-    // owner of the event handler
-    http_server * srv;
-    // sockets for reading
-    fd_set rdset;
-    // sockets for writing
-    fd_set wrset;
-    // maximum descriptor from all the sockets
-    int nsock;
+    // flags for clients
+    int flags[64];
 } Http_server_event_handler;
 
 static int _default_opensocket_function(void * clientp);
@@ -37,11 +31,7 @@ static int _default_socket_function(void * clientp, http_server_socket_t sock, i
 static int Http_server_select_event_loop_init(http_server * srv)
 {
     // Create new default event handler
-    Http_server_event_handler * ev = malloc(sizeof(Http_server_event_handler));
-    ev->srv = srv;
-    FD_ZERO(&ev->rdset);
-    FD_ZERO(&ev->wrset);
-    ev->nsock = 0;
+    Http_server_event_handler * ev = calloc(1, sizeof(Http_server_event_handler));
     srv->socket_data = ev;
 
     srv->sock_listen = HTTP_SERVER_INVALID_SOCKET;
@@ -49,7 +39,7 @@ static int Http_server_select_event_loop_init(http_server * srv)
     srv->opensocket_func = &_default_opensocket_function;
     srv->opensocket_data = srv;
     srv->closesocket_func = &_default_closesocket_function;
-    srv->closesocket_data = srv;
+    srv->closesocket_data = ev;
     srv->socket_func = &_default_socket_function;
 
     return 0;
@@ -103,44 +93,28 @@ static int _default_opensocket_function(void * clientp)
 
 static int _default_closesocket_function(http_server_socket_t sock, void * clientp)
 {
+    fprintf(stderr, "close(%d)\n", sock);
+    Http_server_event_handler * ev = clientp;
+    ev->flags[sock] = 0;
     if (close(sock) == -1)
     {
         perror("close");
+        abort();
     }
     return HTTP_SERVER_OK;
 }
 
 static int _default_socket_function(void * clientp, http_server_socket_t sock, int flags, void * socketp)
 {
-    // Data assigned to listening socket is a `fd_set` 
+    // Data assigned to listening socket is a `fd_set`
     Http_server_event_handler * ev = clientp;
-    http_server * srv = ev->srv;
-    assert(ev);
-    fprintf(stderr, "sock: %d\n", sock);
-    // POLL_IN means "check for read ability"
-    if (flags & HTTP_SERVER_POLL_IN)
-    {
-        fprintf(stderr, "poll in fd=%d\n", sock);
-        FD_SET(sock, &ev->rdset);
-        if (sock > ev->nsock)
-        {
-            ev->nsock = sock;
-        }
-    }
     if (flags & HTTP_SERVER_POLL_REMOVE)
     {
-        FD_CLR(sock, &ev->rdset);
-        // rebuild nsock
-        http_server_client * it = NULL;
-        ev->nsock = 0;
-        SLIST_FOREACH(it, &srv->clients, next)
-        {
-            assert(it);
-            if (it->sock > ev->nsock)
-            {
-                ev->nsock = it->sock;
-            }
-        }
+        ev->flags[sock] = 0;
+    }
+    else
+    {
+        ev->flags[sock] |= flags;
     }
     return HTTP_SERVER_OK;
 }
@@ -152,17 +126,55 @@ static int Http_server_select_event_loop_run(http_server * srv)
     do
     {
         fd_set rd, wr;
-        FD_COPY(&ev->rdset, &rd);
-        FD_COPY(&ev->wrset, &wr);
+        FD_ZERO(&rd);
+        FD_ZERO(&wr);
+
+        int nsock = 0;
+        // Check if client exists on the list
+        http_server_client * it = NULL;
+        SLIST_FOREACH(it, &srv->clients, next)
+        {
+            if (ev->flags[it->sock] & HTTP_SERVER_POLL_IN)
+            {
+                fprintf(stderr, "rd=%d\n", it->sock);
+                FD_SET(it->sock, &rd);
+                if (it->sock > nsock)
+                {
+                    nsock = it->sock;
+                }
+            }
+            if (ev->flags[it->sock] & HTTP_SERVER_POLL_OUT)
+            {
+                fprintf(stderr, "wr=%d\n", it->sock);
+                FD_SET(it->sock, &wr);
+                if (it->sock > nsock)
+                {
+                    nsock = it->sock;
+                }
+            }
+        }
+        if (ev->flags[srv->sock_listen] & HTTP_SERVER_POLL_IN)
+        {
+            fprintf(stderr, "rd sock listen %d\n", srv->sock_listen);
+            FD_SET(srv->sock_listen, &rd);
+            if (srv->sock_listen > nsock)
+            {
+                nsock = srv->sock_listen;
+            }
+        }
+                
+        
         // This will block
         struct timeval tv;
         tv.tv_sec = 1;
         tv.tv_usec = 0;
-        fprintf(stderr, "select(%d, {%d}, ...)\n", ev->nsock + 1, srv->sock_listen);
-        r = select(ev->nsock + 1, &rd, &wr, 0, &tv);
+        fprintf(stderr, "select(%d, {%d}, ...)\n", nsock + 1, srv->sock_listen);
+        r = select(nsock + 1, &rd, &wr, 0, &tv);
+        fprintf(stderr, "r=%d\n", r);
         if (r == -1)
         {
             perror("select");
+            abort();
         }
         else
         {
@@ -175,32 +187,43 @@ static int Http_server_select_event_loop_run(http_server * srv)
         }
         
         // Check if client exists on the list
-        http_server_client * it = NULL;
+        it = NULL;
         SLIST_FOREACH(it, &srv->clients, next)
         {
             assert(it);
             if (FD_ISSET(it->sock, &rd))
             {
+                assert(ev->flags[it->sock] & HTTP_SERVER_POLL_IN);
+                ev->flags[it->sock] ^= HTTP_SERVER_POLL_IN;
                 fprintf(stderr, "client data is available fd=%d\n", it->sock);
                 if (http_server_socket_action(srv, it->sock, HTTP_SERVER_POLL_IN) != HTTP_SERVER_OK)
                 {
                     fprintf(stderr, "failed to do socket action on fd=%d\n", it->sock);
-                    FD_CLR(it->sock, &ev->rdset);
-                    if (srv->closesocket_func(it->sock, srv->closesocket_data) != HTTP_SERVER_OK)
-                    {
-                        return HTTP_SERVER_SOCKET_ERROR;
-                    }
-                    http_server_pop_client(srv, it->sock);
+                    continue;
                 }
+            }
+            if (FD_ISSET(it->sock, &wr))
+            {
+                fprintf(stderr, "send outgoing data=%d\n", it->sock);
+                // Send outgoing data
+                assert(ev->flags[it->sock] & HTTP_SERVER_POLL_OUT);
+                ev->flags[it->sock] ^= HTTP_SERVER_POLL_OUT;
+                if (http_server_socket_action(srv, it->sock, HTTP_SERVER_POLL_OUT) != HTTP_SERVER_OK)
+                {
+                    continue;
+                }
+                fprintf(stderr, "sent success!\n");
             }
         }
 
         if (FD_ISSET(srv->sock_listen, &rd))
         {
+            fprintf(stderr, "action on sock listen\n");
             // Check for new connection
             // This will create new client structure and it will be
             // saved in list.
-            FD_CLR(srv->sock_listen, &ev->rdset);
+            assert(ev->flags[srv->sock_listen] & HTTP_SERVER_POLL_IN);
+            ev->flags[srv->sock_listen] ^= HTTP_SERVER_POLL_IN;
             if (http_server_socket_action(srv, srv->sock_listen, HTTP_SERVER_POLL_IN) != HTTP_SERVER_OK)
             {
                 fprintf(stderr, "unable to accept new client\n");

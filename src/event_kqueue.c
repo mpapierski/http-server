@@ -22,6 +22,8 @@
 #error "Unable to compile this file"
 #endif
 
+#define NEVENTS 64
+
 typedef struct
 {
     http_server * srv;
@@ -30,6 +32,8 @@ typedef struct
     // kqueue event watching acceptor
     struct kevent * chlist;
     // memory size allocated in chlist
+    int chlist_size;
+    // total "available" events in the list
     int evsize;
 
 } Http_server_event_handler;
@@ -47,7 +51,8 @@ static int Http_server_kqueue_event_loop_init(http_server * srv)
         perror("kqueue");
         abort();
     }
-    ev->chlist = NULL;
+    ev->chlist = calloc(NEVENTS, sizeof(struct kevent));
+    ev->chlist_size = NEVENTS;
     ev->evsize = 0;
     ev->srv = srv;
     fprintf(stderr, "srv=%p\n", srv);
@@ -120,7 +125,7 @@ static int _default_closesocket_function(http_server_socket_t sock, void * clien
     // Pop event from the events vector by rewriting all events
     // from the list to the new list excluding the event related
     // with fd descriptor.
-    struct kevent * new_events = malloc(sizeof(struct kevent) * (ev->evsize - 1));
+    struct kevent * new_events = malloc(sizeof(struct kevent) * ev->chlist_size);
     int j = 0;
     for (int i = 0; i < ev->evsize; ++i)
     {
@@ -132,6 +137,7 @@ static int _default_closesocket_function(http_server_socket_t sock, void * clien
     free(ev->chlist);
     ev->chlist = new_events;
     ev->evsize--;
+    //ev->chlist_size--;
     // Close the socket
     if (close(sock) == -1)
     {
@@ -160,15 +166,27 @@ static int _default_socket_function(void * clientp, http_server_socket_t sock, i
     // If structure does not exists then resize the event list
     if (!kev)
     {
-        int current_evsize = ev->evsize;
-        struct kevent * new_events = realloc(ev->chlist, sizeof(struct kevent) * (ev->evsize + 1));
-        if (!new_events)
+        if (ev->evsize + 1 >= ev->chlist_size)
         {
-            abort();
+            fprintf(stderr, "RESIZE!!!\n");
+            int current_evsize = ev->evsize;
+            struct kevent * new_events = realloc(ev->chlist, sizeof(struct kevent) * (ev->chlist_size * 2));
+            if (!new_events)
+            {
+                abort();
+            }
+            ev->chlist_size *= 2;
+            ev->evsize += 1;
+            ev->chlist = new_events;
+            kev = &ev->chlist[current_evsize];
+            fprintf(stderr, "evsize=%d chlist_size=%d\n", ev->evsize, ev->chlist_size);
         }
-        ev->evsize += 1;
-        ev->chlist = new_events;
-        kev = &ev->chlist[current_evsize];
+        else
+        {
+            kev = &ev->chlist[ev->evsize];
+            ev->evsize++;
+            assert(ev->evsize <= ev->chlist_size);
+        }
     }
     // Poll for events
     if (flags & HTTP_SERVER_POLL_IN)

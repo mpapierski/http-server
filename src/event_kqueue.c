@@ -125,19 +125,15 @@ static int _default_closesocket_function(http_server_socket_t sock, void * clien
     // Pop event from the events vector by rewriting all events
     // from the list to the new list excluding the event related
     // with fd descriptor.
-    struct kevent * new_events = malloc(sizeof(struct kevent) * ev->chlist_size);
-    int j = 0;
     for (int i = 0; i < ev->evsize; ++i)
     {
-        if (ev->chlist[i].ident != sock)
+        if (ev->chlist[i].ident == sock)
         {
-            new_events[j++] = ev->chlist[i];
+            memmove(ev->chlist + i, ev->chlist + i + 1, ev->chlist_size - i);
+            break;
         }
     }
-    free(ev->chlist);
-    ev->chlist = new_events;
     ev->evsize--;
-    //ev->chlist_size--;
     // Close the socket
     if (close(sock) == -1)
     {

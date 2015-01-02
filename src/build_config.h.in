@@ -1,0 +1,3 @@
+#cmakedefine HTTP_SERVER_HAVE_EPOLL
+
+#cmakedefine HTTP_SERVER_HAVE_SELECT

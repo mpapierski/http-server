@@ -8,9 +8,18 @@ set (HTTP_SERVER_SOURCES
 set (HTTP_SERVER_HEADERS
 	event.h)
 
-# TODO: check for select(2), epoll(2) etc. and compile correct event handler
-list (APPEND HTTP_SERVER_SOURCES
-	event_select.c)
+# Check for availability of platform-dependent functions
+include (CheckFunctionExists)
+Check_Function_Exists(select HTTP_SERVER_HAVE_SELECT)
+if (HTTP_SERVER_HAVE_SELECT)
+	list (APPEND HTTP_SERVER_SOURCES
+		event_select.c)
+endif ()
+
+configure_file (${CMAKE_CURRENT_SOURCE_DIR}/build_config.h.in
+	${CMAKE_CURRENT_BINARY_DIR}/build_config.h)
+
+include_directories (${CMAKE_CURRENT_BINARY_DIR})
 
 add_library (http_server
 	${HTTP_SERVER_SOURCES}

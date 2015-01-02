@@ -12,6 +12,11 @@
 #include <assert.h>
 #include <strings.h>
 #include "event.h"
+#include "build_config.h"
+
+#if !defined(HTTP_SERVER_HAVE_SELECT)
+#error "Unable to compile this file"
+#endif
 
 typedef struct
 {

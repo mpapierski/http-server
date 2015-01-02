@@ -1,16 +1,18 @@
 #include "http-server/http-server.h"
 #include "event.h"
+#include "build_config.h"
 #include <strings.h>
 #include <assert.h>
 
 int Http_server_event_loop_init(http_server * srv, const char * name)
 {
-	// TODO: There should be several ifdefs to use best event loop on a platform
+#if defined(HTTP_SERVER_HAVE_SELECT)
 	if (strncmp(name, "select", 6) == 0)
 	{
 		srv->event_loop_ = &Http_server_event_loop_select;
 	}
 	else
+#endif
 	{
 		// Invalid event loop
 		return HTTP_SERVER_INVALID_PARAM;

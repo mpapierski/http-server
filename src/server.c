@@ -14,13 +14,26 @@
 
 int http_server_init(http_server * srv)
 {
+    // Clear all fields. All of them is initialized in some way or another
+    // but in case of failure it is easier to debug.
+    srv->sock_listen = HTTP_SERVER_INVALID_SOCKET;
+    srv->sock_listen_data = NULL;
+    srv->opensocket_func = NULL;
+    srv->opensocket_data = NULL;
+    srv->closesocket_func = NULL;
+    srv->closesocket_data = NULL;
+    srv->socket_func = NULL;
+    srv->socket_data = NULL;
+    SLIST_INIT(&srv->clients);
+    srv->handler_ = NULL;
+    srv->response_ = NULL;
+    srv->event_loop_ = NULL;
+    // Initialize event loop by its name
     int result;
-    if ((result = Http_server_event_loop_init(srv)) != HTTP_SERVER_OK)
+    if ((result = Http_server_event_loop_init(srv, "select")) != HTTP_SERVER_OK)
     {
         return result;
     }
-    srv->handler_ = NULL;
-    SLIST_INIT(&srv->clients);
     return HTTP_SERVER_OK;
 }
 

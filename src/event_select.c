@@ -11,6 +11,7 @@
 #include <unistd.h>
 #include <assert.h>
 #include <strings.h>
+#include "event.h"
 
 typedef struct
 {
@@ -28,7 +29,7 @@ static int _default_opensocket_function(void * clientp);
 static int _default_closesocket_function(http_server_socket_t sock, void * clientp);
 static int _default_socket_function(void * clientp, http_server_socket_t sock, int flags, void * socketp);
 
-int Http_server_event_loop_init(http_server * srv)
+static int Http_server_select_event_loop_init(http_server * srv)
 {
     // Create new default event handler
     Http_server_event_handler * ev = malloc(sizeof(Http_server_event_handler));
@@ -49,7 +50,7 @@ int Http_server_event_loop_init(http_server * srv)
 	return 0;
 }
 
-void Http_server_event_loop_free(http_server * srv)
+static void Http_server_select_event_loop_free(http_server * srv)
 {
 }
 
@@ -139,7 +140,7 @@ static int _default_socket_function(void * clientp, http_server_socket_t sock, i
     return HTTP_SERVER_OK;
 }
 
-int Http_server_event_loop_run(http_server * srv)
+static int Http_server_select_event_loop_run(http_server * srv)
 {
 	int r;
     Http_server_event_handler * ev = srv->sock_listen_data;
@@ -206,3 +207,9 @@ int Http_server_event_loop_run(http_server * srv)
     while (r != -1);
     return HTTP_SERVER_OK;
 }
+
+struct Http_server_event_loop Http_server_event_loop_select = {
+	.init_fn = &Http_server_select_event_loop_init,
+	.free_fn = &Http_server_select_event_loop_free,
+	.run_fn = &Http_server_select_event_loop_run
+};

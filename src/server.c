@@ -4,134 +4,22 @@
 #include <stdio.h>
 #include <assert.h>
 #include <sys/socket.h>
-#include <sys/select.h>
-#include <sys/types.h>
-#include <netdb.h>          /* hostent struct, gethostbyname() */
-#include <arpa/inet.h>      /* inet_ntoa() to format IP address */
-#include <netinet/in.h>     /* in_addr structure */
-#include <fcntl.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <arpa/inet.h>
 #include <strings.h>
 #include <errno.h>
 #include <sys/uio.h>
-
-typedef struct
-{
-    // owner of the event handler
-    http_server * srv;
-    // sockets for reading
-    fd_set rdset;
-    // sockets for writing
-    fd_set wrset;
-    // maximum descriptor from all the sockets
-    int nsock;
-} default_event_handler;
-
-static int _default_opensocket_function(void * clientp)
-{
-    int s;
-    int optval;
-    // create default ipv4 socket for listener
-    s = socket(AF_INET, SOCK_STREAM, 0);
-    fprintf(stderr, "open socket: %d\n", s);
-    if (s == -1)
-    {
-        return HTTP_SERVER_INVALID_SOCKET;
-    }
-    // TODO: this part should be separated somehow
-    // set SO_REUSEADDR on a socket to true (1):
-    optval = 1;
-    if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof optval) == -1)
-    {
-        perror("setsockopt");
-        return HTTP_SERVER_INVALID_SOCKET;
-    }
-
-    int flags = fcntl(s, F_GETFL, 0);
-    fcntl(s, F_SETFL, flags | O_NONBLOCK);
-
-    struct sockaddr_in sin;
-    sin.sin_port = htons(5000);
-    sin.sin_addr.s_addr = 0;
-    sin.sin_addr.s_addr = INADDR_ANY;
-    sin.sin_family = AF_INET;
-
-    if (bind(s, (struct sockaddr *)&sin,sizeof(struct sockaddr_in) ) == -1)
-    {
-        perror("bind");
-        return HTTP_SERVER_INVALID_SOCKET;
-    }
-
-    if (listen(s, 128) < 0) {
-        perror("listen");
-        return HTTP_SERVER_INVALID_SOCKET;
-    }
-    return s;
-}
-
-int _default_closesocket_function(http_server_socket_t sock, void * clientp)
-{
-    if (close(sock) == -1)
-    {
-        perror("close");
-    }
-    return HTTP_SERVER_OK;
-}
-
-static int _default_socket_function(void * clientp, http_server_socket_t sock, int flags, void * socketp)
-{
-    // Data assigned to listening socket is a `fd_set` 
-    default_event_handler * ev = clientp;
-    http_server * srv = ev->srv;
-    assert(ev);
-    fprintf(stderr, "sock: %d\n", sock);
-    // POLL_IN means "check for read ability"
-    if (flags & HTTP_SERVER_POLL_IN)
-    {
-        fprintf(stderr, "poll in fd=%d\n", sock);
-        FD_SET(sock, &ev->rdset);
-        if (sock > ev->nsock)
-        {
-            ev->nsock = sock;
-        }
-    }
-    if (flags & HTTP_SERVER_POLL_REMOVE)
-    {
-        FD_CLR(sock, &ev->rdset);
-        // rebuild nsock
-        http_server_client * it = NULL;
-        ev->nsock = 0;
-        SLIST_FOREACH(it, &srv->clients, next)
-        {
-            assert(it);
-            if (it->sock > ev->nsock)
-            {
-                ev->nsock = it->sock;
-            }
-        }
-    }
-    return HTTP_SERVER_OK;
-}
+#include "event.h"
 
 int http_server_init(http_server * srv)
 {
-    // Create new default event handler
-    default_event_handler * ev = malloc(sizeof(default_event_handler));
-    ev->srv = srv;
-    FD_ZERO(&ev->rdset);
-    FD_ZERO(&ev->wrset);
-    ev->nsock = 0;
-    srv->socket_data = ev;
-
-    srv->sock_listen = HTTP_SERVER_INVALID_SOCKET;
-    srv->sock_listen_data = ev;
-    srv->opensocket_func = &_default_opensocket_function;
-    srv->opensocket_data = srv;
-    srv->closesocket_func = &_default_closesocket_function;
-    srv->closesocket_data = srv;
-    srv->socket_func = &_default_socket_function;
+    int result;
+    if ((result = Http_server_event_loop_init(srv)) != HTTP_SERVER_OK)
+    {
+        return result;
+    }
     srv->handler_ = NULL;
-
     SLIST_INIT(&srv->clients);
     return HTTP_SERVER_OK;
 }
@@ -141,7 +29,7 @@ int http_server_init(http_server * srv)
  */
 void http_server_free(http_server * srv)
 {
-    
+    Http_server_event_loop_free(srv);    
 }
 
 int http_server_setopt(http_server * srv, http_server_option opt, ...)
@@ -218,70 +106,7 @@ int http_server_start(http_server * srv)
 
 int http_server_run(http_server * srv)
 {
-    int r;
-    default_event_handler * ev = srv->sock_listen_data;
-    do
-    {
-        fd_set rd, wr;
-        FD_COPY(&ev->rdset, &rd);
-        FD_COPY(&ev->wrset, &wr);
-        // This will block
-        struct timeval tv;
-        tv.tv_sec = 1;
-        tv.tv_usec = 0;
-        fprintf(stderr, "select(%d, {%d}, ...)\n", ev->nsock + 1, srv->sock_listen);
-        r = select(ev->nsock + 1, &rd, &wr, 0, &tv);
-        if (r == -1)
-        {
-            perror("select");
-        }
-        else
-        {
-            fprintf(stderr, "select result=%d\n", r);
-        }
-        if (r == 0)
-        {
-            // Nothing to do...
-            continue;
-        }
-        
-        // Check if client exists on the list
-        http_server_client * it = NULL;
-        SLIST_FOREACH(it, &srv->clients, next)
-        {
-            assert(it);
-            if (FD_ISSET(it->sock, &rd))
-            {
-                fprintf(stderr, "client data is available fd=%d\n", it->sock);
-                if (http_server_socket_action(srv, it->sock, HTTP_SERVER_POLL_IN) != HTTP_SERVER_OK)
-                {
-                    fprintf(stderr, "failed to do socket action on fd=%d\n", it->sock);
-                    FD_CLR(it->sock, &ev->rdset);
-                    if (srv->closesocket_func(it->sock, srv->closesocket_data) != HTTP_SERVER_OK)
-                    {
-                        return HTTP_SERVER_SOCKET_ERROR;
-                    }
-                    http_server_pop_client(srv, it->sock);
-                }
-            }
-        }
-
-        if (FD_ISSET(srv->sock_listen, &rd))
-        {
-            // Check for new connection
-            // This will create new client structure and it will be
-            // saved in list.
-            FD_CLR(srv->sock_listen, &ev->rdset);
-            if (http_server_socket_action(srv, srv->sock_listen, HTTP_SERVER_POLL_IN) != HTTP_SERVER_OK)
-            {
-                fprintf(stderr, "unable to accept new client\n");
-                continue;
-            }
-            continue;
-        }
-    }
-    while (r != -1);
-    return HTTP_SERVER_OK;
+    return Http_server_event_loop_run(srv);
 }
 
 int http_server_assign(http_server * srv, http_server_socket_t sock, void * data)

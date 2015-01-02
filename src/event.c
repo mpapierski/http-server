@@ -9,7 +9,16 @@ int Http_server_event_loop_init(http_server * srv, const char * name)
 #if defined(HTTP_SERVER_HAVE_SELECT)
     if (strncmp(name, "select", 6) == 0)
     {
+        extern struct Http_server_event_loop Http_server_event_loop_select;
         srv->event_loop_ = &Http_server_event_loop_select;
+    }
+    else
+#endif
+#if defined(HTTP_SERVER_HAVE_KQUEUE)
+    if (strncmp(name, "kqueue", 6) == 0)
+    {
+        extern struct Http_server_event_loop Http_server_event_loop_kqueue;
+        srv->event_loop_ = &Http_server_event_loop_kqueue;
     }
     else
 #endif

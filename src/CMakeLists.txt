@@ -16,6 +16,12 @@ if (HTTP_SERVER_HAVE_SELECT)
 		event_select.c)
 endif ()
 
+Check_Function_Exists (kqueue HTTP_SERVER_HAVE_KQUEUE)
+if (HTTP_SERVER_HAVE_KQUEUE)
+	list (APPEND HTTP_SERVER_SOURCES
+		event_kqueue.c)
+endif ()
+
 configure_file (${CMAKE_CURRENT_SOURCE_DIR}/build_config.h.in
 	${CMAKE_CURRENT_BINARY_DIR}/build_config.h)
 

@@ -1,3 +1,5 @@
 #cmakedefine HTTP_SERVER_HAVE_EPOLL
 
 #cmakedefine HTTP_SERVER_HAVE_SELECT
+
+#cmakedefine HTTP_SERVER_HAVE_KQUEUE

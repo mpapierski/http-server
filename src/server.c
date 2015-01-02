@@ -11,6 +11,7 @@
 #include <errno.h>
 #include <sys/uio.h>
 #include "event.h"
+#include "build_config.h"
 
 int http_server_init(http_server * srv)
 {
@@ -29,8 +30,25 @@ int http_server_init(http_server * srv)
     srv->response_ = NULL;
     srv->event_loop_ = NULL;
     // Initialize event loop by its name
+    char * event_loop = getenv("HTTP_SERVER_EVENT_LOOP");
+#if defined(HTTP_SERVER_HAVE_KQUEUE)
+    if (!event_loop)
+    {
+        event_loop = "kqueue";
+    }
+#elif defined(HTTP_SERVER_HAVE_SELECT)
+    if (!event_loop)
+    {
+        event_loop = "select";
+    }
+#endif
+    if (!event_loop)
+    {
+        return HTTP_SERVER_INVALID_PARAM;
+    }
     int result;
-    if ((result = Http_server_event_loop_init(srv, "select")) != HTTP_SERVER_OK)
+    fprintf(stderr, "initialize event loop %s\n", event_loop);
+    if ((result = Http_server_event_loop_init(srv, event_loop)) != HTTP_SERVER_OK)
     {
         return result;
     }
@@ -106,6 +124,8 @@ success:
 
 int http_server_start(http_server * srv)
 {
+    assert(srv);
+    assert(srv->sock_listen);
     // Create listening socket
     srv->sock_listen = srv->opensocket_func(srv->opensocket_data);
     if (srv->sock_listen == HTTP_SERVER_INVALID_SOCKET)

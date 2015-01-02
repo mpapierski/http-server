@@ -14,4 +14,3 @@ void Http_server_event_loop_free(http_server * srv);
 
 int Http_server_event_loop_run(http_server * srv);
 
-struct Http_server_event_loop Http_server_event_loop_select;

@@ -181,11 +181,6 @@ int http_server_pop_client(http_server * srv, http_server_socket_t sock)
         if (it->sock == sock)
         {
             SLIST_REMOVE(&srv->clients, it, http_server_client, next);
-            // TODO: close socket callback
-            if (srv->closesocket_func(it->sock, srv->closesocket_data) != HTTP_SERVER_OK)
-            {
-                return HTTP_SERVER_SOCKET_ERROR;
-            }
             free(it);
             r = HTTP_SERVER_OK;
             break;
@@ -208,6 +203,7 @@ int http_server_socket_action(http_server * srv, http_server_socket_t socket, in
         if (fd == -1)
         {
             perror("accept");
+            return HTTP_SERVER_SOCKET_ERROR;
         }
         // Add this socket to managed list
         if (http_server_add_client(srv, fd) != HTTP_SERVER_OK)

@@ -36,6 +36,7 @@ int http_server_init(http_server * srv)
     srv->handler_ = NULL;
     srv->response_ = NULL;
     srv->event_loop_ = NULL;
+    srv->event_loop_data_ = NULL;
     // Initialize event loop by its name
     char * event_loop = getenv("HTTP_SERVER_EVENT_LOOP");
 #if defined(HTTP_SERVER_HAVE_KQUEUE)

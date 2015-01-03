@@ -41,6 +41,7 @@ static int Http_server_select_event_loop_init(http_server * srv)
     // Create new default event handler
     Http_server_event_handler * ev = calloc(1, sizeof(Http_server_event_handler));
     srv->socket_data = ev;
+    srv->event_loop_data_ = ev;
 
     srv->sock_listen = HTTP_SERVER_INVALID_SOCKET;
     srv->sock_listen_data = ev;
@@ -55,7 +56,7 @@ static int Http_server_select_event_loop_init(http_server * srv)
 
 static void Http_server_select_event_loop_free(http_server * srv)
 {
-    Http_server_event_handler * ev = srv->socket_data;
+    Http_server_event_handler * ev = srv->event_loop_data_;
     assert(ev);
     free(ev);
 }

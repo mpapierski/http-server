@@ -106,6 +106,7 @@ int http_server_response_begin(http_server_client * client, http_server_response
 int http_server_response_end(http_server_response * res)
 {
     assert(res);
+    assert(res->is_done == 0);
     // Mark the response as "finished" so we can know when to proceed
     // to the next request.
     res->is_done = 1;

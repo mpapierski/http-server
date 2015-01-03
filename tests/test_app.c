@@ -33,8 +33,22 @@ int on_message_complete(http_server_client * client, void * data)
     ASSERT(res);
     int r = http_server_response_begin(client, res);
     ASSERT(r == HTTP_SERVER_OK);
-
-    if (strncmp(req->url, "/get/", sizeof(req->url) - 1) == 0)
+    if (strncmp(req->url, "/set-headers/", sizeof(req->url) - 1) == 0)
+    {
+        for (int i = 0; i < 10; ++i)
+        {
+            char key[16], value[16];
+            int key_size = snprintf(key, sizeof(key), "Key%d", i);
+            int value_size = snprintf(value, sizeof(value), "Value%d", i);
+            r = http_server_response_set_header(res, key, key_size, value, value_size);
+            ASSERT(r == HTTP_SERVER_OK);
+        }
+        r = http_server_response_write_head(res, 200);
+        ASSERT(r == HTTP_SERVER_OK);
+        r = http_server_response_printf(res, "url=%s\n", req->url);
+        ASSERT(r == HTTP_SERVER_OK);
+    }
+    else if (strncmp(req->url, "/get/", sizeof(req->url) - 1) == 0)
     {
         if (client->parser_.method == HTTP_GET)
         {

@@ -49,6 +49,14 @@ int on_message_complete(http_server_client * client, void * data)
             ASSERT(r == HTTP_SERVER_OK);
         }
     }
+    else if (strncmp(req->url, "/cancel/", sizeof(req->url) - 1) == 0)
+    {
+        int result = http_server_cancel(client->server_);
+        r = http_server_response_write_head(res, 200);
+        ASSERT(r == HTTP_SERVER_OK);
+        r = http_server_response_printf(res, "success=%d\n", result);
+        ASSERT(r == HTTP_SERVER_OK);
+    }
     else
     {
         r = http_server_response_write_head(res, 404);

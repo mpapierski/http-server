@@ -216,6 +216,11 @@ static int Http_server_kqueue_event_loop_run(http_server * srv)
     Http_server_event_handler * ev = srv->closesocket_data;
     for (;;)
     {
+        if (ev->evsize == 0)
+        {
+            fprintf(stderr, "no more events...\n");
+            break;
+        }
         struct kevent * evlist = calloc(ev->evsize, sizeof(struct kevent));
         assert(evlist);
         assert(ev->chlist);

@@ -137,6 +137,26 @@ int http_server_start(http_server * srv)
     return HTTP_SERVER_OK;
 }
 
+int http_server_cancel(http_server * srv)
+{
+    assert(srv);
+    if (srv->sock_listen == HTTP_SERVER_INVALID_SOCKET)
+    {
+        return HTTP_SERVER_INVALID_PARAM;
+    }
+    // Stop polling on this socket
+   if (srv->socket_func(srv->socket_data, srv->sock_listen, HTTP_SERVER_POLL_REMOVE, srv->sock_listen_data) != HTTP_SERVER_OK)
+    {
+        return HTTP_SERVER_SOCKET_ERROR;
+    }
+    // Close acceptor
+    if (srv->closesocket_func(srv->sock_listen, srv->closesocket_data) != HTTP_SERVER_OK)
+    {
+        return HTTP_SERVER_SOCKET_ERROR;
+    }
+    return HTTP_SERVER_OK;
+}
+
 int http_server_run(http_server * srv)
 {
     return Http_server_event_loop_run(srv);

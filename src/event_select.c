@@ -165,6 +165,12 @@ static int Http_server_select_event_loop_run(http_server * srv)
                 nsock = srv->sock_listen;
             }
         }
+
+        if (nsock == 0)
+        {
+            fprintf(stderr, "no more events..\n");
+            break;
+        }
                 
         
         // This will block

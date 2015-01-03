@@ -236,6 +236,12 @@ int http_server_setopt(http_server * srv, http_server_option opt, ...);
 int http_server_start(http_server * srv);
 
 /**
+ * Cancels the http server and no new connections will be accepted.
+ * @param srv Server
+ */
+int http_server_cancel(http_server * srv);
+
+/**
  * Blocks and serves connections
  */
 int http_server_run(http_server * srv);

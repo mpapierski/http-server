@@ -79,6 +79,7 @@ int on_message_complete(http_server_client * client, void * data)
     r = http_server_response_end(res);
     ASSERT(r == HTTP_SERVER_OK);
     free(req);
+    client->data = NULL;
     return 0;
 }
 

@@ -1,7 +1,7 @@
 import subprocess
 import unittest
 import sys
-import urllib2
+import httplib
 import os
 import sys
 import itertools
@@ -10,66 +10,82 @@ from urlparse import urljoin
 
 exe = os.environ['EXECUTABLE']
 
-def urlopen(*args, **kwargs):
-    """Sometimes server process is not ready yet, so we need
-    to retry whenever connection refused is happens."""
-    for retry_count in range(10):
-        try:
-            return urllib2.urlopen(*args, **kwargs)
-        except urllib2.URLError as e:
-            if 'Connection refused' in str(e):
-                sys.stderr.write('Retrying connection... {}\n'.format(retry_count))
-                time.sleep(0.1)
-                continue
-            raise
 
 class BlackboxTestCase(unittest.TestCase):
     """Test suite that runs every test case on a single
     instance of server
     """
-    #@classmethod
+    @classmethod
+    def _create_http_connection(cls):
+        return httplib.HTTPConnection(host='127.0.0.1', port=5000)
+
     def setUp(self):
         self.proc = subprocess.Popen([exe])
-        self.url = 'http://127.0.0.1:5000'
+        self.conn = self._create_http_connection()
 
-    #@classmethod
+    def request(self, *args, **kwargs):
+        for retry in xrange(10):
+            try:
+                self.conn.request(*args, **kwargs)
+                res = self.conn.getresponse()
+                return res
+            except Exception as e:
+                sys.stderr.write('Cannot send request ({0}).. retry {1}\n'.format(e, retry))
+                time.sleep(0.1)
+                self.conn = self._create_http_connection()
+                continue
+        raise httplib.CannotSendRequest()
+
     def tearDown(self):
         # The process should stop after receiving GET /cancel/
-        res = urlopen(urljoin(self.url, '/cancel/'))
+        res = self.request('GET', '/cancel/')
         self.assertEqual(res.read(), 'success=0\n')
+        self.conn.close()
         exit_code = self.proc.wait()
         self.assertEqual(exit_code, 0)
 
     def test_get(self):
-        res = urlopen(urljoin(self.url, '/get/'))
+        res = self.request('GET', '/get/')
+        self.assertEqual(res.status, 200)
         self.assertEqual(res.read(), 'url=/get/\n')
-        self.assertEqual(res.info().getheader('Transfer-Encoding'), 'chunked')
+        self.assertEqual(res.getheader('Transfer-Encoding'), 'chunked')
 
     def test_post(self):
-        with self.assertRaisesRegexp(urllib2.HTTPError, r'^HTTP Error 405: Method Not Allowed$') as cm:
-            res = urlopen(urljoin(self.url, '/get/'), data='asdf')
-        res = cm.exception
+        res = self.request('POST', '/get/')
+        self.assertEqual(res.status, 405)
         self.assertEqual(res.read(), '')
-        self.assertEqual(res.info().getheader('Transfer-Encoding'), 'chunked')
+        self.assertEqual(res.getheader('Transfer-Encoding'), 'chunked')
 
     def test_not_found(self):
-        with self.assertRaisesRegexp(urllib2.HTTPError, r'^HTTP Error 404: Not Found$') as cm:
-            res = urlopen(urljoin(self.url, '/page/not/found/'))
-        self.assertEqual(cm.exception.read(), '')
+        res = self.request('GET', '/page/not/found/')
+        self.assertEqual(res.status, 404)
+        self.assertEqual(res.read(), '')
 
     def test_set_headers(self):
-        res = urlopen(urljoin(self.url, '/set-headers/'))
+        res = self.request('GET', '/set-headers/')
+        self.assertEqual(res.status, 200)
         self.assertEqual(res.read(), 'url=/set-headers/\n')
-        self.assertEqual(res.info().getheader('Key0'), 'Value0')
-        self.assertEqual(res.info().getheader('Key1'), 'Value1')
-        self.assertEqual(res.info().getheader('Key2'), 'Value2')
-        self.assertEqual(res.info().getheader('Key3'), 'Value3')
-        self.assertEqual(res.info().getheader('Key4'), 'Value4')
-        self.assertEqual(res.info().getheader('Key5'), 'Value5')
-        self.assertEqual(res.info().getheader('Key6'), 'Value6')
-        self.assertEqual(res.info().getheader('Key7'), 'Value7')
-        self.assertEqual(res.info().getheader('Key8'), 'Value8')
-        self.assertEqual(res.info().getheader('Key9'), 'Value9')
+        self.assertEqual(res.getheader('Key0'), 'Value0')
+        self.assertEqual(res.getheader('Key1'), 'Value1')
+        self.assertEqual(res.getheader('Key2'), 'Value2')
+        self.assertEqual(res.getheader('Key3'), 'Value3')
+        self.assertEqual(res.getheader('Key4'), 'Value4')
+        self.assertEqual(res.getheader('Key5'), 'Value5')
+        self.assertEqual(res.getheader('Key6'), 'Value6')
+        self.assertEqual(res.getheader('Key7'), 'Value7')
+        self.assertEqual(res.getheader('Key8'), 'Value8')
+        self.assertEqual(res.getheader('Key9'), 'Value9')
+
+    def test_get_multiple(self):
+        res = self.request('GET', '/get/')
+        self.assertEqual(res.status, 200)
+        self.assertEqual(res.read(), 'url=/get/\n')
+        self.assertEqual(res.getheader('Transfer-Encoding'), 'chunked')
+
+        res = self.request('GET', '/get/')
+        self.assertEqual(res.status, 200)
+        self.assertEqual(res.read(), 'url=/get/\n')
+        self.assertEqual(res.getheader('Transfer-Encoding'), 'chunked')
 
 if __name__ == '__main__':
     unittest.main()

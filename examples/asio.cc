@@ -229,7 +229,10 @@ private:
         int result = http_server_socket_action(&srv_, socket->native_handle(), HTTP_SERVER_POLL_IN);
         if (result != HTTP_SERVER_OK)
         {
-            throw boost::system::system_error(result, get_http_error_category(), "http_server_socket_action");
+            if (result != HTTP_SERVER_CLIENT_EOF)
+            {
+                throw boost::system::system_error(result, get_http_error_category(), "http_server_socket_action");
+            }
         }
     }
     void handle_write(const boost::system::error_code & error,

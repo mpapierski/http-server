@@ -18,6 +18,14 @@
 #error "Unable to compile this file"
 #endif
 
+
+#ifndef SLIST_FOREACH_SAFE
+#define SLIST_FOREACH_SAFE(var, head, field, tvar) \
+for ((var) = SLIST_FIRST((head)); \
+(var) && ((tvar) = SLIST_NEXT((var), field), 1); \
+(var) = (tvar))
+#endif
+
 typedef struct
 {
     // flags for clients
@@ -137,6 +145,7 @@ static int Http_server_select_event_loop_run(http_server * srv)
         http_server_client * it = NULL;
         SLIST_FOREACH(it, &srv->clients, next)
         {
+            assert(it->sock > -1);
             if (ev->flags[it->sock] & HTTP_SERVER_POLL_IN)
             {
                 fprintf(stderr, "rd=%d\n", it->sock);
@@ -197,7 +206,8 @@ static int Http_server_select_event_loop_run(http_server * srv)
         
         // Check if client exists on the list
         it = NULL;
-        SLIST_FOREACH(it, &srv->clients, next)
+        http_server_client * it_temp;
+        SLIST_FOREACH_SAFE(it, &srv->clients, next, it_temp)
         {
             assert(it);
             if (FD_ISSET(it->sock, &rd))
@@ -205,9 +215,13 @@ static int Http_server_select_event_loop_run(http_server * srv)
                 assert(ev->flags[it->sock] & HTTP_SERVER_POLL_IN);
                 ev->flags[it->sock] ^= HTTP_SERVER_POLL_IN;
                 fprintf(stderr, "client data is available fd=%d\n", it->sock);
-                if (http_server_socket_action(srv, it->sock, HTTP_SERVER_POLL_IN) != HTTP_SERVER_OK)
+                int action_result = http_server_socket_action(srv, it->sock, HTTP_SERVER_POLL_IN);
+                if (action_result != HTTP_SERVER_OK)
                 {
-                    fprintf(stderr, "failed to do socket action on fd=%d\n", it->sock);
+                    if (action_result != HTTP_SERVER_CLIENT_EOF)
+                    {
+                        fprintf(stderr, "failed to do socket action on fd=%d\n", it->sock);
+                    }
                     continue;
                 }
             }

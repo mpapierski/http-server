@@ -13,6 +13,13 @@
 #include "event.h"
 #include "build_config.h"
 
+#ifndef SLIST_FOREACH_SAFE
+#define SLIST_FOREACH_SAFE(var, head, field, tvar) \
+for ((var) = SLIST_FIRST((head)); \
+(var) && ((tvar) = SLIST_NEXT((var), field), 1); \
+(var) = (tvar))
+#endif
+
 int http_server_init(http_server * srv)
 {
     // Clear all fields. All of them is initialized in some way or another
@@ -214,8 +221,8 @@ int http_server_pop_client(http_server * srv, http_server_socket_t sock)
 {
     assert(srv);
     int r = HTTP_SERVER_INVALID_SOCKET;
-    http_server_client * it = NULL;
-    SLIST_FOREACH(it, &srv->clients, next)
+    http_server_client * it, * it_temp;
+    SLIST_FOREACH_SAFE(it, &srv->clients, next, it_temp)
     {
         assert(it);
         if (it->sock == sock)
@@ -262,8 +269,8 @@ int http_server_socket_action(http_server * srv, http_server_socket_t socket, in
         return HTTP_SERVER_OK;
     }
     int r = HTTP_SERVER_OK;
-    http_server_client * it, * client = NULL;
-    SLIST_FOREACH(it, &srv->clients, next)
+    http_server_client * it, * it_temp, * client = NULL;
+    SLIST_FOREACH_SAFE(it, &srv->clients, next, it_temp)
     {
         assert(it);
         if (it->sock == socket)
@@ -320,8 +327,11 @@ int http_server_socket_action(http_server * srv, http_server_socket_t socket, in
             {
                 return HTTP_SERVER_SOCKET_ERROR;
             }
-            http_server_pop_client(srv, it->sock);
-            return HTTP_SERVER_OK;
+            // Remove client from the list and tell the caller that it should not
+            // do any operation with current socket.
+            SLIST_REMOVE(&srv->clients, it, http_server_client, next);
+            free(it);
+            return HTTP_SERVER_CLIENT_EOF;
         }
         else
         {
@@ -403,8 +413,9 @@ int http_server_socket_action(http_server * srv, http_server_socket_t socket, in
         // Pop buffers from response
         iocnt = 0;
         buf = NULL;
-        TAILQ_FOREACH(buf, &res->buffer, bufs)
+        while (!TAILQ_EMPTY(&res->buffer))
         {
+            buf = TAILQ_FIRST(&res->buffer);
             if (iocnt >= maxiov)
             {
                 break;

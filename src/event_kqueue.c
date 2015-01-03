@@ -45,7 +45,7 @@ static int _default_socket_function(void * clientp, http_server_socket_t sock, i
 static int Http_server_kqueue_event_loop_init(http_server * srv)
 {
     // Create new default event handler
-    Http_server_event_handler * ev = calloc(1, sizeof(Http_server_event_handler));
+    Http_server_event_handler * ev = malloc(sizeof(Http_server_event_handler));
     if ((ev->kq = kqueue()) == -1)
     {
         perror("kqueue");
@@ -55,9 +55,7 @@ static int Http_server_kqueue_event_loop_init(http_server * srv)
     ev->chlist_size = NEVENTS;
     ev->evsize = 0;
     ev->srv = srv;
-    fprintf(stderr, "srv=%p\n", srv);
-
-    srv->socket_data = ev;
+    //srv->socket_data = ev;
     srv->sock_listen = HTTP_SERVER_INVALID_SOCKET;
     srv->sock_listen_data = NULL;
     srv->opensocket_func = &_default_opensocket_function;
@@ -71,6 +69,18 @@ static int Http_server_kqueue_event_loop_init(http_server * srv)
 
 static void Http_server_kqueue_event_loop_free(http_server * srv)
 {
+    Http_server_event_handler * ev = srv->socket_data;
+    assert(ev);
+    // Close kqueue(2) fd
+    if (close(ev->kq) == -1)
+    {
+        perror("close");
+        abort();
+    }
+    // Free kevent vector
+    free(ev->chlist);
+    // Free space for event handler
+    free(ev);
 }
 
 static int _default_opensocket_function(void * clientp)

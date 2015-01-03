@@ -47,6 +47,9 @@ static int Http_server_select_event_loop_init(http_server * srv)
 
 static void Http_server_select_event_loop_free(http_server * srv)
 {
+    Http_server_event_handler * ev = srv->socket_data;
+    assert(ev);
+    free(ev);
 }
 
 static int _default_opensocket_function(void * clientp)

@@ -11,6 +11,7 @@ void test_init()
 {
     int result = http_server_init(&srv);
     ok(result == HTTP_SERVER_OK, "init result %d (expected %d)", result, HTTP_SERVER_OK);
+    http_server_free(&srv);
 }
 
 static http_server_socket_t _opensocket_function(void * arg)
@@ -73,11 +74,6 @@ void test_start()
     cmp_ok(srv.sock_listen, "!=", HTTP_SERVER_INVALID_SOCKET);
 }
 
-void test_cleanup()
-{
-    http_server_free(&srv);
-}
-
 void test_manage_clients()
 {
     int r;
@@ -111,7 +107,6 @@ int main(int argc, char * argv[])
 {
     test_init();
     test_setopt();
-    test_cleanup();
     test_start();
     test_manage_clients();
     done_testing();

@@ -205,23 +205,28 @@ int http_server_response_write(http_server_response * res, char * data, int size
     // Flush all headers if they arent already sent
     if (!res->headers_sent)
     {
-        struct http_server_header * header = NULL;
-        TAILQ_FOREACH(header, &res->headers, headers)
+        while (!TAILQ_EMPTY(&res->headers))
         {
-            // XXX: Make one big buffer from headers
+            // Add all queued headers to the response queue
+            struct http_server_header * header = TAILQ_FIRST(&res->headers);
             char data[1024];
             int data_len = sprintf(data, "%.*s: %.*s\r\n", header->key_size, header->key, header->value_size, header->value);
             int r = _response_add_buffer(res, data, data_len);
-
+            // Remove first header from the queue
             TAILQ_REMOVE(&res->headers, header, headers);
             free(header->key);
             free(header->value);
             free(header);
-
-            assert(r == 0);
+            if (r != HTTP_SERVER_OK)
+            {
+                return r;
+            }
         }
         int r = _response_add_buffer(res, "\r\n", 2);
-        assert(r == 0);
+        if (r != HTTP_SERVER_OK)
+        {
+            return r;
+        }
         res->headers_sent = 1;
     }
     if (res->is_chunked)

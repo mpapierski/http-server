@@ -70,9 +70,9 @@ void http_server_response_free(http_server_response * res)
         return;
     }
     // Free queued buffers
-    http_server_buf * buf;
-    TAILQ_FOREACH(buf, &res->buffer, bufs)
+    while (!TAILQ_EMPTY(&res->buffer))
     {
+        http_server_buf * buf = TAILQ_FIRST(&res->buffer);
         assert(buf);
         TAILQ_REMOVE(&res->buffer, buf, bufs);
         free(buf->mem);
@@ -176,9 +176,10 @@ int http_server_response_set_header(http_server_response * res, char * name, int
     if (http_server_header_cmp(&hdr_contentlength, hdr) == 0)
     {
         // Remove Transfer-encoding if user sets content-length
-        struct http_server_header * header;
-        TAILQ_FOREACH(header, &res->headers, headers)
+
+        while (!TAILQ_EMPTY(&res->headers))
         {
+            struct http_server_header * header = TAILQ_FIRST(&res->headers);
             if (http_server_header_cmp(&hdr_transferencoding, header) == 0)
             {
                 TAILQ_REMOVE(&res->headers, header, headers);

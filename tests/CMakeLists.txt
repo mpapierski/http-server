@@ -1,3 +1,7 @@
+include (CodeCoverage)
+set (CMAKE_CXX_FLAGS "-fprofile-arcs -ftest-coverage")
+set (CMAKE_C_FLAGS "-fprofile-arcs -ftest-coverage")
+
 # Test server for blackbox testing
 find_package (PythonInterp)
 
@@ -29,14 +33,20 @@ if (PYTHONINTERP_FOUND)
         COMMAND ${CMAKE_COMMAND} -E chdir ${CMAKE_CURRENT_SOURCE_DIR} ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/generate.py ${CMAKE_CURRENT_SOURCE_DIR})
 endif ()
 
-# Test cases
+# Test suite
+
 add_executable (test_suite
     test_response.c
     test_errors.c
     test_http_server.c
     clar.c
     clar.h
-    main.c
-)
+    main.c)
 target_link_libraries (test_suite
     http_server)
+
+# Coverage stuff
+get_property (test_suite_exe TARGET test_suite PROPERTY LOCATION)
+SETUP_TARGET_FOR_COVERAGE (test_suite_cov
+    ${test_suite_exe}
+    coverage)

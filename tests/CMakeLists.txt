@@ -47,6 +47,6 @@ target_link_libraries (test_suite
 
 # Coverage stuff
 get_property (test_suite_exe TARGET test_suite PROPERTY LOCATION)
-SETUP_TARGET_FOR_COVERAGE (test_suite_cov
+SETUP_TARGET_FOR_COVERAGE (coverage
     ${test_suite_exe}
     coverage)

@@ -179,6 +179,10 @@ typedef struct http_server
      * Private holder for holding current event loop pointer
      */
     void * event_loop_;
+    /**
+     * Private custom data for the event loop
+     */
+    void * event_loop_data_;
 } http_server;
 
 #define HTTP_SERVER_ENUM_ERROR_CODES(XX) \

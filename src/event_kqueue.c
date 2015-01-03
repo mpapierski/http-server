@@ -55,7 +55,7 @@ static int Http_server_kqueue_event_loop_init(http_server * srv)
     ev->chlist_size = NEVENTS;
     ev->evsize = 0;
     ev->srv = srv;
-    //srv->socket_data = ev;
+    srv->event_loop_data_ = ev;
     srv->sock_listen = HTTP_SERVER_INVALID_SOCKET;
     srv->sock_listen_data = NULL;
     srv->opensocket_func = &_default_opensocket_function;
@@ -69,7 +69,7 @@ static int Http_server_kqueue_event_loop_init(http_server * srv)
 
 static void Http_server_kqueue_event_loop_free(http_server * srv)
 {
-    Http_server_event_handler * ev = srv->socket_data;
+    Http_server_event_handler * ev = srv->event_loop_data_;
     assert(ev);
     // Close kqueue(2) fd
     if (close(ev->kq) == -1)

@@ -1,0 +1,42 @@
+extern void test_test_response__enum(void);
+extern void test_test_response__without_chunked_response(void);
+extern void test_test_response__with_content_length(void);
+extern void test_test_errors__invalid_error(void);
+extern void test_test_errors__check_messages(void);
+extern void test_test_http_server__setopt(void);
+extern void test_test_http_server__initialize(void);
+extern void test_test_http_server__cleanup(void);
+static const struct clar_func _clar_cb_test_response[] = {
+    { "enum", &test_test_response__enum },
+    { "without_chunked_response", &test_test_response__without_chunked_response },
+    { "with_content_length", &test_test_response__with_content_length }
+};
+static const struct clar_func _clar_cb_test_errors[] = {
+    { "invalid_error", &test_test_errors__invalid_error },
+    { "check_messages", &test_test_errors__check_messages }
+};
+static const struct clar_func _clar_cb_test_http_server[] = {
+    { "setopt", &test_test_http_server__setopt }
+};
+static struct clar_suite _clar_suites[] = {
+    {
+        "test::errors",
+        { NULL, NULL },
+        { NULL, NULL },
+        _clar_cb_test_errors, 2, 1
+    },
+    {
+        "test::http::server",
+        { "initialize", &test_test_http_server__initialize },
+        { "cleanup", &test_test_http_server__cleanup },
+        _clar_cb_test_http_server, 1, 1
+    },
+    {
+        "test::response",
+        { NULL, NULL },
+        { NULL, NULL },
+        _clar_cb_test_response, 3, 1
+    }
+};
+static const size_t _clar_suite_count = 3;
+static const size_t _clar_callback_count = 6;

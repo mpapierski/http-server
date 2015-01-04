@@ -139,11 +139,14 @@ static int _default_closesocket_function(http_server_socket_t sock, void * clien
     {
         if (ev->chlist[i].ident == sock)
         {
-            memmove(ev->chlist + i, ev->chlist + i + 1, ev->chlist_size - i);
+            struct kevent tmp;
+            tmp = ev->chlist[ev->evsize - 1];
+            ev->chlist[ev->evsize - 1] = ev->chlist[i];
+            ev->chlist[i] = tmp;
+            ev->evsize--;
             break;
         }
     }
-    ev->evsize--;
     // Close the socket
     if (close(sock) == -1)
     {
@@ -239,18 +242,8 @@ static int Http_server_kqueue_event_loop_run(http_server * srv)
                 fprintf(stderr, "EV_ERROR: %s\n", strerror(evlist[i].data));
                 abort();
             }
-            //if (evlist[i].flags & EV_EOF)
-            //{
-            //    fprintf(stderr, "EV_EOF: %d\n", evlist[i].ident);
-            //    //evlist[i] = (struct kevent){0};
-            //    //EV_SET(evlist[i], evlist[i].ident, EVFILT_READ | EVFILT_WRITE, EV_DELETE, 0, 0, 0);
-            //    continue;
-            //}
-            //if (evlist[i].ident == srv->sock_listen)
-
             if (evlist[i].filter == EVFILT_READ)
             {
-                //EV_SET(&ev->chlist[i], evlist[i].ident, EVFILT_READ, EV_DISABLE, 0, 0, 0);
                 if (http_server_socket_action(srv, evlist[i].ident, HTTP_SERVER_POLL_IN) != HTTP_SERVER_OK)
                 {
                     fprintf(stderr, "unable to read incoming data\n");
@@ -259,15 +252,12 @@ static int Http_server_kqueue_event_loop_run(http_server * srv)
             }
             if (evlist[i].filter == EVFILT_WRITE)
             {
-                //EV_SET(&ev->chlist[i], evlist[i].ident, EVFILT_WRITE, EV_DISABLE, 0, 0, 0);
-                //EV_SET(&ev->chlist[i], evlist[i].ident, EVFILT_READ | EVFILT_WRITE, EV_DISABLE, 0, 0, 0);
                 if (http_server_socket_action(srv, evlist[i].ident, HTTP_SERVER_POLL_OUT) != HTTP_SERVER_OK)
                 {
                     fprintf(stderr, "unable to write outgoing data\n");
                     continue;
                 }
             }
-            //if (evlist[i].ident)
         }
         free(evlist);
     }

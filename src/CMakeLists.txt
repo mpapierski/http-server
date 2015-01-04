@@ -3,7 +3,8 @@ set (HTTP_SERVER_SOURCES
     errors.c
     client.c
     response.c
-    event.c)
+    event.c
+    handler.c)
 	
 set (HTTP_SERVER_HEADERS
 	event.h)

@@ -8,6 +8,7 @@
 typedef struct 
 {
     char url[1024];
+    char body[1024];
 } http_server_request;
 
 #define ASSERT(expr) do { if (!(expr)) { fprintf(stderr, "Error! assert(" #expr ") failed.\n"); abort(); }} while (0)
@@ -22,6 +23,14 @@ int on_url(http_server_client * client, void * data, const char * buf, size_t si
     }
     fprintf(stderr, "URL chunk: %.*s\n", (int)size, buf);
     strncpy(request->url, buf, size);
+    return 0;
+}
+
+int on_body(http_server_client * client, void * data, const char * buf, size_t size)
+{
+    http_server_request * request = client->data;
+    assert(request);
+    strncpy(request->body, buf, size);
     return 0;
 }
 
@@ -63,6 +72,21 @@ int on_message_complete(http_server_client * client, void * data)
             ASSERT(r == HTTP_SERVER_OK);
         }
     }
+    else if (strncmp(req->url, "/post/", sizeof(req->url) - 1) == 0)
+    {
+        if (client->parser_.method == HTTP_POST)
+        {
+            r = http_server_response_write_head(res, 200);
+            ASSERT(r == HTTP_SERVER_OK);
+            r = http_server_response_printf(res, "body=%s\n", req->body);
+            ASSERT(r == HTTP_SERVER_OK);
+        }
+        else
+        {
+            r = http_server_response_write_head(res, 405);
+            ASSERT(r == HTTP_SERVER_OK);
+        }
+    }
     else if (strncmp(req->url, "/cancel/", sizeof(req->url) - 1) == 0)
     {
         int result = http_server_cancel(client->server_);
@@ -96,9 +120,11 @@ int main(int argc, char * argv[])
     }
     // Init handler function
     http_server_handler handler;
-    bzero(&handler, sizeof(handler));
+    result = http_server_handler_init(&handler);
+    ASSERT(result == HTTP_SERVER_OK);
     handler.on_url = &on_url;
     handler.on_message_complete = &on_message_complete;
+    handler.on_body = &on_body;
     if ((result = http_server_setopt(&srv, HTTP_SERVER_OPT_HANDLER, &handler)) != HTTP_SERVER_OK)
     {
         fprintf(stderr, "Unable to set handler: %s\n", http_server_errstr(result));

@@ -50,10 +50,16 @@ class BlackboxTestCase(unittest.TestCase):
         self.assertEqual(res.read(), 'url=/get/\n')
         self.assertEqual(res.getheader('Transfer-Encoding'), 'chunked')
 
-    def test_post(self):
+    def test_invalid_method(self):
         res = self.request('POST', '/get/')
         self.assertEqual(res.status, 405)
         self.assertEqual(res.read(), '')
+        self.assertEqual(res.getheader('Transfer-Encoding'), 'chunked')
+
+    def test_post(self):
+        res = self.request('POST', '/post/', 'hello world!')
+        self.assertEqual(res.status, 200)
+        self.assertEqual(res.read(), 'body=hello world!\n')
         self.assertEqual(res.getheader('Transfer-Encoding'), 'chunked')
 
     def test_not_found(self):

@@ -65,14 +65,19 @@ typedef int (*http_server_handler_data_cb)(struct http_server_client * client, v
 /** Callback without args */
 typedef int (*http_server_handler_cb)(struct http_server_client * client, void * data);
 
-
 typedef struct http_server_handler
 {
+    // Custom user specified data
     void * data;
+    // Called when received chunk of url
     http_server_handler_data_cb on_url;
     void * on_url_data;
+    // Called when message is completed
     http_server_handler_cb on_message_complete;
     void * on_message_complete_data;
+    // Called chunk of body
+    http_server_handler_data_cb on_body;
+    void * on_body_data;
 } http_server_handler;
 
 typedef struct http_server_buf
@@ -344,6 +349,11 @@ typedef enum
     HTTP_SERVER_ENUM_STATUS_CODES(XX)
 #undef XX
 } http_server_status_code;
+
+/**
+ * Initialize new handler structure
+ */
+int http_server_handler_init(http_server_handler * handler);
 
 /**
  * Creates new response object

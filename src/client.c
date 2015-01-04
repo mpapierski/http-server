@@ -8,26 +8,38 @@ static int my_url_callback(http_parser * parser, const char * at, size_t length)
 {
     http_server_client * client = parser->data;
     fprintf(stderr, "url chunk: %.*s\n", (int)length, at);
-    return client->handler->on_url(client, client->handler->on_url_data, at, length);
+    int rv = 0;
+    if (client->handler && client->handler->on_url)
+    {
+        rv = client->handler->on_url(client, client->handler->on_url_data, at, length);
+    }
+    return rv;
 }
 
 static int my_message_complete_callback(http_parser * parser)
 {
     http_server_client * client = parser->data;
     fprintf(stderr, "message complete\n");
-    int rv = client->handler->on_message_complete(client, client->handler->on_message_complete_data);
+    int rv = 0;
+    if (client->handler && client->handler->on_message_complete)
+    {
+        rv = client->handler->on_message_complete(client, client->handler->on_message_complete_data);
+    }
     client->is_complete = 1;
     return rv;
 }
-
 
 static int my_on_body(http_parser * parser, const char * at, size_t length)
 {
     http_server_client * client = parser->data;
     fprintf(stderr, "body: %.*s\n", (int)length, at);
-    return 0;
+    int rv;
+    if (client->handler && client->handler->on_body)
+    {
+        rv = client->handler->on_body(client, client->handler->on_body_data, at, length);
+    }
+    return rv;
 }
-
 
 http_server_client * http_server_new_client(http_server * server, http_server_socket_t sock, http_server_handler * handler)
 {

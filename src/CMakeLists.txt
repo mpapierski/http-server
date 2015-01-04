@@ -5,7 +5,8 @@ set (HTTP_SERVER_SOURCES
     response.c
     event.c
     handler.c
-    string.c)
+    string.c
+    header.c)
 	
 set (HTTP_SERVER_HEADERS
 	event.h)

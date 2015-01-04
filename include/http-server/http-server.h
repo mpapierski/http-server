@@ -68,6 +68,11 @@ const char * http_server_string_str(http_server_string * str);
 void http_server_string_clear(http_server_string * str);
 
 /**
+ * Move memory from str1 to str2.
+ */
+void http_server_string_move(http_server_string * str1, http_server_string * str2);
+
+/**
  * Callback that will be called whenever http-server requests
  * new socket. At this point it is up to user to set socket's
  * purpse. It could be UDP or TCP (or some abstract type)
@@ -129,11 +134,19 @@ typedef struct http_server_buf
 struct http_server_header
 {
     TAILQ_ENTRY(http_server_header) headers;
-    char * key;
-    int key_size;
-    char * value;
-    int value_size;
+    http_server_string field;
+    http_server_string value;
 };
+
+/**
+ * Construct new HTTP header instance
+ */
+struct http_server_header * http_server_header_new();
+
+/**
+ * Free single HTTP server header
+ */
+void http_server_header_free(struct http_server_header * header);
 
 /**
  * HTTP rresponse object
@@ -173,12 +186,8 @@ typedef struct http_server_client
     // all incomming http headers
     TAILQ_HEAD(http_server__request_headers, http_server_header) headers;
     char header_state_; // (S)tart,(F)ield,(V)alue
-    char * header_field_;
-    int header_field_len_;
-    int header_field_size_;
-    char * header_value_;
-    int header_value_len_;
-    int header_value_size_;
+    http_server_string header_field_;
+    http_server_string header_value_;
 } http_server_client;
 
 typedef struct http_server

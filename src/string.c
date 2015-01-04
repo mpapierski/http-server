@@ -63,3 +63,17 @@ void http_server_string_clear(http_server_string * str)
     str->len = 0;
     str->size = 0;
 }
+
+void http_server_string_move(http_server_string * str1, http_server_string * str2)
+{
+    if (str2->buf)
+    {
+        http_server_string_free(str2);
+    }
+    str2->buf = str1->buf;
+    str1->buf = NULL;
+    str2->len = str1->len;
+    str1->len = 0;
+    str2->size = str1->size;
+    str1->size = 0;
+}

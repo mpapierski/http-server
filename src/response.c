@@ -8,8 +8,8 @@
 
 static int http_server_header_cmp(struct http_server_header * lhs, struct http_server_header * rhs)
 {
-    char * a = lhs->key;
-    char * b = rhs->key;
+    const char * a = http_server_string_str(&lhs->field);
+    const char * b = http_server_string_str(&rhs->field);
     while( *a && *b )
     {
         int r = tolower(*a) - tolower(*b);
@@ -83,8 +83,8 @@ void http_server_response_free(http_server_response * res)
     TAILQ_FOREACH(header, &res->headers, headers)
     {
         TAILQ_REMOVE(&res->headers, header, headers);
-        free(header->key);
-        free(header->value);
+        http_server_string_free(&header->field);
+        http_server_string_free(&header->value);
         free(header);
     }
     free(res);
@@ -153,27 +153,33 @@ int http_server_response_set_header(http_server_response * res, char * name, int
     assert(!res->headers_sent && "Headers already sent");
 
     // Add new header
-    struct http_server_header * hdr = malloc(sizeof(struct http_server_header));
-
-    hdr->key = malloc(namelen + 1);
-    memcpy(hdr->key, name, namelen);
-    hdr->key[namelen] = '\0';
-    hdr->key_size = namelen;
-
-    hdr->value = malloc(valuelen + 1);
-    memcpy(hdr->value, value, valuelen);
-    hdr->value[valuelen] = '\0';
-    hdr->value_size = valuelen;
+    struct http_server_header * hdr = http_server_header_new();
+    int r;
+    if ((r = http_server_string_append(&hdr->field, name, namelen)) != HTTP_SERVER_OK)
+    {
+        return r;
+    }
+    if ((r = http_server_string_append(&hdr->value, value, valuelen)) != HTTP_SERVER_OK)
+    {
+        return r;
+    }
     
     // Disable chunked encoding if user specifies length
     struct http_server_header hdr_contentlength;
-    hdr_contentlength.key = "Content-Length";
-    hdr_contentlength.key_size = 14;
-
+    http_server_string_init(&hdr_contentlength.field);
+    if ((r = http_server_string_append(&hdr_contentlength.field, "Content-Length", 14)) != HTTP_SERVER_OK)
+    {
+        return r;
+    }
     struct http_server_header hdr_transferencoding;
-    hdr_transferencoding.key = "Transfer-Encoding";
-    hdr_transferencoding.key_size = 17;
-
+    http_server_string_init(&hdr_transferencoding.field);
+    if ((r = http_server_string_append(&hdr_transferencoding.field, "Transfer-Encoding", 17)) != HTTP_SERVER_OK)
+    {
+        return r;
+    }
+    
+    // Check if user tries to set Content-length header, so we
+    // have to disable chunked encoding.
     if (http_server_header_cmp(&hdr_contentlength, hdr) == 0)
     {
         // Remove Transfer-encoding if user sets content-length
@@ -184,9 +190,7 @@ int http_server_response_set_header(http_server_response * res, char * name, int
             if (http_server_header_cmp(&hdr_transferencoding, header) == 0)
             {
                 TAILQ_REMOVE(&res->headers, header, headers);
-                free(header->key);
-                free(header->value);
-                free(header);
+                http_server_header_free(header);
             }
         }
         res->is_chunked = 0;
@@ -212,13 +216,11 @@ int http_server_response_write(http_server_response * res, char * data, int size
             // Add all queued headers to the response queue
             struct http_server_header * header = TAILQ_FIRST(&res->headers);
             char data[1024];
-            int data_len = sprintf(data, "%.*s: %.*s\r\n", header->key_size, header->key, header->value_size, header->value);
+            int data_len = sprintf(data, "%s: %s\r\n", http_server_string_str(&header->field), http_server_string_str(&header->value));
             int r = _response_add_buffer(res, data, data_len);
             // Remove first header from the queue
             TAILQ_REMOVE(&res->headers, header, headers);
-            free(header->key);
-            free(header->value);
-            free(header);
+            http_server_header_free(header);
             if (r != HTTP_SERVER_OK)
             {
                 return r;

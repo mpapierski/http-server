@@ -132,10 +132,8 @@ void test_test_response__without_chunked_response(void)
     // check if there is only one header and its chunked encoding
     struct http_server_header * header = TAILQ_FIRST(&res->headers);
     cl_assert(!!header);
-    cl_assert_equal_s(header->key, "Transfer-Encoding");
-    cl_assert_equal_i(header->key_size, 17);
-    cl_assert_equal_s(header->value, "chunked");
-    cl_assert_equal_i(header->value_size, 7);
+    cl_assert_equal_s(http_server_string_str(&header->field), "Transfer-Encoding");
+    cl_assert_equal_s(http_server_string_str(&header->value), "chunked");
     header = TAILQ_NEXT(header, headers);
     cl_assert(!header); // no more headers
     // now siwtch to content-length and chunked encoding should be gone
@@ -146,16 +144,12 @@ void test_test_response__without_chunked_response(void)
     // check if there is only one header and its chunked encoding
     header = TAILQ_FIRST(&res->headers);
     cl_assert(!!header);
-    cl_assert_equal_s(header->key, "Transfer-Encoding");
-    cl_assert_equal_i(header->key_size, 17);
-    cl_assert_equal_s(header->value, "chunked");
-    cl_assert_equal_i(header->value_size, 7);
+    cl_assert_equal_s(http_server_string_str(&header->field), "Transfer-Encoding");
+    cl_assert_equal_s(http_server_string_str(&header->value), "chunked");
     header = TAILQ_NEXT(header, headers);
     cl_assert(!!header);
-    cl_assert_equal_s(header->key, "Key0");
-    cl_assert_equal_i(header->key_size, 4);
-    cl_assert_equal_s(header->value, "Value0");
-    cl_assert_equal_i(header->value_size, 6);
+    cl_assert_equal_s(http_server_string_str(&header->field), "Key0");
+    cl_assert_equal_s(http_server_string_str(&header->value), "Value0");
     header = TAILQ_NEXT(header, headers);
     cl_assert(!header);
     // write some data to flush headers
@@ -212,10 +206,8 @@ void test_test_response__with_content_length(void)
     // check if there is only one header and its chunked encoding
     struct http_server_header * header = TAILQ_FIRST(&res->headers);
     cl_assert(!!header);
-    cl_assert_equal_s(header->key, "Transfer-Encoding");
-    cl_assert_equal_i(header->key_size, 17);
-    cl_assert_equal_s(header->value, "chunked");
-    cl_assert_equal_i(header->value_size, 7);
+    cl_assert_equal_s(http_server_string_str(&header->field), "Transfer-Encoding");
+    cl_assert_equal_s(http_server_string_str(&header->value), "chunked");
     header = TAILQ_NEXT(header, headers);
     cl_assert(!header); // no more headers
     // now siwtch to content-length and chunked encoding should be gone
@@ -228,16 +220,12 @@ void test_test_response__with_content_length(void)
     // check if there is only one header and its chunked encoding
     header = TAILQ_FIRST(&res->headers);
     cl_assert(!!header);
-    cl_assert_equal_s(header->key, content_length);
-    cl_assert_equal_i(header->key_size, strlen(content_length));
-    cl_assert_equal_s(header->value, "123");
-    cl_assert_equal_i(header->value_size, 3);
+    cl_assert_equal_s(http_server_string_str(&header->field), content_length);
+    cl_assert_equal_s(http_server_string_str(&header->value), "123");
     header = TAILQ_NEXT(header, headers);
     cl_assert(!!header);
-    cl_assert_equal_s(header->key, "Key0");
-    cl_assert_equal_i(header->key_size, 4);
-    cl_assert_equal_s(header->value, "Value0");
-    cl_assert_equal_i(header->value_size, 6);
+    cl_assert_equal_s(http_server_string_str(&header->field), "Key0");
+    cl_assert_equal_s(http_server_string_str(&header->value), "Value0");
     header = TAILQ_NEXT(header, headers);
     cl_assert(!header);
     // write some data to flush headers

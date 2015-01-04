@@ -79,7 +79,7 @@ int on_message_complete(http_server_client * client, void * data)
             struct http_server_header * header;
             TAILQ_FOREACH(header, &client->headers, headers)
             {
-                r = http_server_response_printf(res, "%s=%s\n", header->key, header->value);
+                r = http_server_response_printf(res, "%s=%s\n", http_server_string_str(&header->field), http_server_string_str(&header->value));
                 ASSERT(r == HTTP_SERVER_OK);
             }
             r = http_server_response_printf(res, "total_headers=%d\n", req->headers_received);

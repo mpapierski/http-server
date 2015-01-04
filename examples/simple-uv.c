@@ -81,18 +81,15 @@ int _socket_function(void * clientp, http_server_socket_t sock, int flags, void 
 
 // HTTP handler callbacks
 
-int on_url(http_server_client * client, void * data, const char * buf, size_t size)
-{
-    fprintf(stderr, "URL chunk: %.*s\n", (int)size, buf);
-    return 0;
-}
-
 int on_message_complete(http_server_client * client, void * data)
 {
-    fprintf(stderr, "Message complete\n");
+    char * url;
+    int r = http_server_client_getinfo(client, HTTP_SERVER_CLIENTINFO_URL, &url);
+    assert(r == HTTP_SERVER_OK);
+    fprintf(stderr, "Message complete %s\n", url);
     http_server_response * res = http_server_response_new();
     assert(res);
-    int r = http_server_response_begin(client, res);
+    r = http_server_response_begin(client, res);
     assert(r == HTTP_SERVER_OK);
     r = http_server_response_write_head(res, 200);
     assert(r == HTTP_SERVER_OK);
@@ -113,8 +110,7 @@ int main(int argc, char * argv[])
     http_server_init(&srv);
     srv.sock_listen_data = NULL; // should be null by default
 
-    bzero(&handler, sizeof(handler));
-    handler.on_url = &on_url;
+    http_server_handler_init(&handler);
     handler.on_message_complete = &on_message_complete;
 
     result = http_server_setopt(&srv, HTTP_SERVER_OPT_HANDLER, &handler);

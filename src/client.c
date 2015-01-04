@@ -1,6 +1,7 @@
 #include "http-server/http-server.h"
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdarg.h>
 #include <strings.h>
 #include <assert.h>
 
@@ -21,9 +22,11 @@ static int my_url_callback(http_parser * parser, const char * at, size_t length)
     http_server_client * client = parser->data;
     fprintf(stderr, "url chunk: %.*s\n", (int)length, at);
     int rv = 0;
-    if (client->handler && client->handler->on_url)
+    if (http_server_string_append(&client->url, at, length) != HTTP_SERVER_OK)
     {
-        rv = client->handler->on_url(client, client->handler->on_url_data, at, length);
+        // Failed to add more memory to the URL. Failure, stop.
+        fprintf(stderr, "failed to add more moemory to url\n");
+        return 1;
     }
     return rv;
 }
@@ -39,6 +42,7 @@ static int my_message_complete_callback(http_parser * parser)
     }
     client->is_complete = 1;
     http_server__client_free_headers(client);
+    http_server_string_clear(&client->url);
     return rv;
 }
 
@@ -57,7 +61,7 @@ static int my_on_body(http_parser * parser, const char * at, size_t length)
 static int my_on_header_field(http_parser * parser, const char * at, size_t length)
 {
     http_server_client * client = parser->data;
-    int result;
+    int result = 0;
     if (client->header_state_ == 'S')
     {
         if (client->header_field_len_ + length >= client->header_field_size_)
@@ -236,6 +240,8 @@ http_server_client * http_server_new_client(http_server * server, http_server_so
     client->server_ = server;
     client->current_flags = 0;
     client->is_complete = 0;
+    // Initialize string which will hold full URL data
+    http_server_string_init(&client->url);
     // Initialize request headers
     TAILQ_INIT(&client->headers);
     // Temporary data for incomming request headers
@@ -262,8 +268,9 @@ int http_server_perform_client(http_server_client * client, const char * at, siz
     fprintf(stderr, "parse %d/%d\n", (int)size, nparsed);
     if (nparsed != size)
     {
+        const char * err = http_errno_description(client->parser_.http_errno);
         // Error
-        fprintf(stderr, "unable to execute parser %d/%d\n", (int)nparsed, (int)size);
+        fprintf(stderr, "unable to execute parser %d/%d (%s)\n", (int)nparsed, (int)size, err);
         return HTTP_SERVER_PARSER_ERROR;
     }
     return HTTP_SERVER_OK;
@@ -294,6 +301,27 @@ int http_server_poll_client(http_server_client * client, int flags)
     if (client->server_->socket_func(client->server_->socket_data, client->sock, client->current_flags, client->data) != HTTP_SERVER_OK)
     {
         return HTTP_SERVER_SOCKET_ERROR;
+    }
+    return HTTP_SERVER_OK;
+}
+
+int http_server_client_getinfo(http_server_client * client, http_server_clientinfo code, ...)
+{
+    if (!client)
+    {
+        return HTTP_SERVER_INVALID_PARAM;
+    }
+    if (code == HTTP_SERVER_CLIENTINFO_URL)
+    {
+        va_list ap;
+        va_start(ap, code);
+        char ** url = va_arg(ap, char **);
+        *url = (char *)http_server_string_str(&client->url);
+        va_end(ap);
+    }
+    else
+    {
+        return HTTP_SERVER_INVALID_PARAM;
     }
     return HTTP_SERVER_OK;
 }

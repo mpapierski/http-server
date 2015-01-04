@@ -30,11 +30,6 @@ inline boost::system::error_category & get_http_error_category()
     return category;
 }
 
-struct http_server_request
-{
-    std::string url;
-};
-
 class http_server_service
     : public boost::asio::io_service::service
 {
@@ -81,8 +76,6 @@ public:
             throw boost::system::system_error(result, get_http_error_category(), "http_server_setopt");
         }
         // Prepare handler object
-        handler_.on_url = &on_url;
-        handler_.on_url_data = this;
         handler_.on_message_complete = &on_message_complete;
         handler_.on_message_complete_data = this;
 
@@ -251,26 +244,12 @@ private:
             throw boost::system::system_error(result, get_http_error_category(), "http_server_socket_action");
         }
     }
-    static int on_url(http_server_client * client, void * data, const char * buf, size_t size)
-    {
-        assert(data);
-        if (!client->data)
-        {
-            client->data = new http_server_request;
-        }
-        http_server_service * svc = static_cast<http_server_service *>(data);
-        static_cast<http_server_request *>(client->data)->url.append(buf, size);
-        //fprintf(stderr, "URL chunk: %.*s\n", (int)size, buf);
-        return 0;
-    }
     static int on_message_complete(http_server_client * client, void * data)
     {
         return static_cast<http_server_service *>(client->handler->data)->handle_message(client, data);
     }
     int handle_message(http_server_client * client, void * data)
     {
-        http_server_request * req = static_cast<http_server_request *>(client->data);
-
         // Write response
         http_server_response * res = http_server_response_new();
         
@@ -286,8 +265,16 @@ private:
         {
             throw boost::system::system_error(result, get_http_error_category(), "http_server_response_write_head");   
         }
+        char * info_url;
+        result = http_server_client_getinfo(client, HTTP_SERVER_CLIENTINFO_URL, &info_url);
+        if (result != HTTP_SERVER_OK)
+        {
+            throw boost::system::system_error(result, get_http_error_category(), "http_server_client_getinfo");   
+        }
+        assert(info_url);
+        std::string url = info_url;
         // Send streaming response
-        if (req->url == "/stream/")
+        if (url == "/stream/")
         {
             boost::shared_ptr<boost::asio::deadline_timer> timer =
                 boost::make_shared<boost::asio::deadline_timer>(boost::ref(get_io_service()));
@@ -310,7 +297,7 @@ private:
         {
             throw boost::system::system_error(result, get_http_error_category(), "http_server_response_write");   
         }
-        length = sprintf(chunk, "URL: %s!\n", req->url.c_str());
+        length = sprintf(chunk, "URL: %s!\n", url.c_str());
         result = http_server_response_write(res, chunk, length);
         if (result != HTTP_SERVER_OK)
         {
@@ -322,8 +309,6 @@ private:
         {
             throw boost::system::system_error(result, get_http_error_category(), "http_server_response_end");   
         }
-        delete req;
-        client->data = NULL;
         return 0;
     }
     void stream_response(const boost::system::error_code & ec,

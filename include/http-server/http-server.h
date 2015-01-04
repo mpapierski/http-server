@@ -55,12 +55,17 @@ void http_server_string_free(http_server_string * str);
 /**
  * Append data to the string
  */
-int http_server_string_append(http_server_string * str, char * data, int size);
+int http_server_string_append(http_server_string * str, const char * data, int size);
 
 /**
  * Get string representation
  */
 const char * http_server_string_str(http_server_string * str);
+
+/**
+ * Clear memory allocated in string
+ */
+void http_server_string_clear(http_server_string * str);
 
 /**
  * Callback that will be called whenever http-server requests
@@ -102,9 +107,6 @@ typedef struct http_server_handler
 {
     // Custom user specified data
     void * data;
-    // Called when received chunk of url
-    http_server_handler_data_cb on_url;
-    void * on_url_data;
     // Called when message is completed
     http_server_handler_cb on_message_complete;
     void * on_message_complete_data;
@@ -166,6 +168,8 @@ typedef struct http_server_client
     struct http_server * server_;
     int current_flags; // current I/O poll flags
     int is_complete; // request is complete
+    // URL of the request
+    http_server_string url;
     // all incomming http headers
     TAILQ_HEAD(http_server__request_headers, http_server_header) headers;
     char header_state_; // (S)tart,(F)ield,(V)alue
@@ -339,6 +343,22 @@ http_server_client * http_server_new_client(http_server * server, http_server_so
  * Free memory allocated by HTTP client instance
  */
 void http_server_client_free(http_server_client * client);
+
+// List of info codes that returns details about client
+#define HTTP_SERVER_ENUM_CLIENT_INFO_CODES(XX) \
+    XX(URL, 0)
+
+typedef enum
+{
+#define XX(name, value) HTTP_SERVER_CLIENTINFO ## _ ## name = value
+    HTTP_SERVER_ENUM_CLIENT_INFO_CODES(XX)
+#undef XX
+} http_server_clientinfo;
+
+/**
+ * Get info about client instance
+ */
+int http_server_client_getinfo(http_server_client * client, http_server_clientinfo, ...);
 
 /**
  * Feeds client using chunk of datad    

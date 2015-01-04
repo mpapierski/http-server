@@ -18,7 +18,7 @@ void http_server_string_free(http_server_string * str)
     free(str->buf);
 }
 
-int http_server_string_append(http_server_string * str, char * data, int size)
+int http_server_string_append(http_server_string * str, const char * data, int size)
 {
     assert(str);
     if (str->len + size >= str->size)
@@ -50,4 +50,16 @@ int http_server_string_append(http_server_string * str, char * data, int size)
 const char * http_server_string_str(http_server_string * str)
 {
     return str->buf;
+}
+
+void http_server_string_clear(http_server_string * str)
+{
+    if (!str)
+    {
+        return;
+    }
+    free(str->buf);
+    str->buf = NULL;
+    str->len = 0;
+    str->size = 0;
 }

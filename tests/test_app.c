@@ -7,7 +7,6 @@
 
 typedef struct 
 {
-    char url[1024];
     char body[1024];
     int headers_received;
 } http_server_request;
@@ -15,26 +14,12 @@ typedef struct
 http_server_request * create_request(void)
 {
     http_server_request * req = malloc(sizeof(http_server_request));
-    memset(req->url, '\0', sizeof(req->url));
     memset(req->body, '\0', sizeof(req->body));
     req->headers_received = 0;
     return req;
 }
 
 #define ASSERT(expr) do { if (!(expr)) { fprintf(stderr, "Error! assert(" #expr ") failed.\n"); abort(); }} while (0)
-
-int on_url(http_server_client * client, void * data, const char * buf, size_t size)
-{
-    http_server_request * request = client->data;
-    if (!request)
-    {
-        client->data = create_request();
-        request = client->data;
-    }
-    fprintf(stderr, "URL chunk: %.*s\n", (int)size, buf);
-    strncpy(request->url, buf, size);
-    return 0;
-}
 
 int on_body(http_server_client * client, void * data, const char * buf, size_t size)
 {
@@ -47,6 +32,11 @@ int on_body(http_server_client * client, void * data, const char * buf, size_t s
 int on_header(http_server_client * client, void * data, const char * field, const char * value)
 {
     http_server_request * request = client->data;
+    if (!request)
+    {
+        client->data = create_request();
+        request = client->data;
+    }
     request->headers_received += 1;
     return 0;
 }
@@ -57,9 +47,13 @@ int on_message_complete(http_server_client * client, void * data)
     fprintf(stderr, "Message complete\n");
     http_server_response * res = http_server_response_new();
     ASSERT(res);
-    int r = http_server_response_begin(client, res);
+    char * url;
+    int r = http_server_client_getinfo(client, HTTP_SERVER_CLIENTINFO_URL, &url);
     ASSERT(r == HTTP_SERVER_OK);
-    if (strncmp(req->url, "/set-headers/", sizeof(req->url) - 1) == 0)
+    r = http_server_response_begin(client, res);
+    ASSERT(r == HTTP_SERVER_OK);
+    assert(url);
+    if (strncmp(url, "/set-headers/", 13) == 0)
     {
         for (int i = 0; i < 10; ++i)
         {
@@ -71,16 +65,16 @@ int on_message_complete(http_server_client * client, void * data)
         }
         r = http_server_response_write_head(res, 200);
         ASSERT(r == HTTP_SERVER_OK);
-        r = http_server_response_printf(res, "url=%s\n", req->url);
+        r = http_server_response_printf(res, "url=%s\n", url);
         ASSERT(r == HTTP_SERVER_OK);
     }
-    else if (strncmp(req->url, "/get/", sizeof(req->url) - 1) == 0)
+    else if (strncmp(url, "/get/", 5) == 0)
     {
         if (client->parser_.method == HTTP_GET)
         {
             r = http_server_response_write_head(res, 200);
             ASSERT(r == HTTP_SERVER_OK);
-            r = http_server_response_printf(res, "url=%s\n", req->url);
+            r = http_server_response_printf(res, "url=%s\n", url);
             ASSERT(r == HTTP_SERVER_OK);
             struct http_server_header * header;
             TAILQ_FOREACH(header, &client->headers, headers)
@@ -97,7 +91,7 @@ int on_message_complete(http_server_client * client, void * data)
             ASSERT(r == HTTP_SERVER_OK);
         }
     }
-    else if (strncmp(req->url, "/post/", sizeof(req->url) - 1) == 0)
+    else if (strncmp(url, "/post/", 6) == 0)
     {
         if (client->parser_.method == HTTP_POST)
         {
@@ -112,7 +106,7 @@ int on_message_complete(http_server_client * client, void * data)
             ASSERT(r == HTTP_SERVER_OK);
         }
     }
-    else if (strncmp(req->url, "/cancel/", sizeof(req->url) - 1) == 0)
+    else if (strncmp(url, "/cancel/", 8) == 0)
     {
         int result = http_server_cancel(client->server_);
         r = http_server_response_write_head(res, 200);
@@ -147,7 +141,6 @@ int main(int argc, char * argv[])
     http_server_handler handler;
     result = http_server_handler_init(&handler);
     ASSERT(result == HTTP_SERVER_OK);
-    handler.on_url = &on_url;
     handler.on_message_complete = &on_message_complete;
     handler.on_body = &on_body;
     handler.on_header = &on_header;

@@ -52,3 +52,14 @@ void test_strings__append(void)
 	cl_assert_equal_i(s[11], '!');
 	cl_assert_equal_i(s[12], '\0');
 }
+
+void test_strings__clear(void)
+{
+	int r = http_server_string_append(&str, "Hello", 5);
+	cl_assert_equal_i(str.len, 5);
+	cl_assert_equal_s(http_server_string_str(&str), "Hello");
+	http_server_string_clear(&str);
+	r = http_server_string_append(&str, " world", 6);
+	cl_assert_equal_i(r, HTTP_SERVER_OK);
+	cl_assert_equal_s(http_server_string_str(&str), " world");
+}

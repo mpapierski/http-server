@@ -65,6 +65,9 @@ typedef int (*http_server_handler_data_cb)(struct http_server_client * client, v
 /** Callback without args */
 typedef int (*http_server_handler_cb)(struct http_server_client * client, void * data);
 
+/** Received new header callback */
+typedef int (*http_server_header_cb)(struct http_server_client * client, void * data, const char * field, const char * value);
+
 typedef struct http_server_handler
 {
     // Custom user specified data
@@ -78,6 +81,9 @@ typedef struct http_server_handler
     // Called chunk of body
     http_server_handler_data_cb on_body;
     void * on_body_data;
+    // Called whenever new header is received
+    http_server_header_cb on_header;
+    void * on_header_data;
 } http_server_handler;
 
 typedef struct http_server_buf
@@ -130,6 +136,15 @@ typedef struct http_server_client
     struct http_server * server_;
     int current_flags; // current I/O poll flags
     int is_complete; // request is complete
+    // all incomming http headers
+    TAILQ_HEAD(http_server__request_headers, http_server_header) headers;
+    char header_state_; // (S)tart,(F)ield,(V)alue
+    char * header_field_;
+    int header_field_len_;
+    int header_field_size_;
+    char * header_value_;
+    int header_value_len_;
+    int header_value_size_;
 } http_server_client;
 
 typedef struct http_server
@@ -288,6 +303,11 @@ int http_server_socket_action(http_server * srv, http_server_socket_t socket, in
  * Create new HTTP client instance
  */
 http_server_client * http_server_new_client(http_server * server, http_server_socket_t sock, http_server_handler * handler);
+
+/**
+ * Free memory allocated by HTTP client instance
+ */
+void http_server_client_free(http_server_client * client);
 
 /**
  * Feeds client using chunk of datad    

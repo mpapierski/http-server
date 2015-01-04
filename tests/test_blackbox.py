@@ -47,7 +47,12 @@ class BlackboxTestCase(unittest.TestCase):
     def test_get(self):
         res = self.request('GET', '/get/')
         self.assertEqual(res.status, 200)
-        self.assertEqual(res.read(), 'url=/get/\n')
+        lines = res.read().splitlines()
+        self.assertEqual(len(lines), 4)
+        self.assertEqual(lines[0], 'url=/get/')
+        self.assertEqual(lines[1], 'Host=127.0.0.1:5000')
+        self.assertEqual(lines[2], 'Accept-Encoding=identity')
+        self.assertEqual(lines[3], 'total_headers=2')
         self.assertEqual(res.getheader('Transfer-Encoding'), 'chunked')
 
     def test_invalid_method(self):
@@ -85,12 +90,21 @@ class BlackboxTestCase(unittest.TestCase):
     def test_get_multiple(self):
         res = self.request('GET', '/get/')
         self.assertEqual(res.status, 200)
-        self.assertEqual(res.read(), 'url=/get/\n')
+        lines = res.read().splitlines()
+        self.assertEqual(lines[0], 'url=/get/')
+        self.assertEqual(lines[1], 'Host=127.0.0.1:5000')
+        self.assertEqual(lines[2], 'Accept-Encoding=identity')
+        self.assertEqual(lines[3], 'total_headers=2')
         self.assertEqual(res.getheader('Transfer-Encoding'), 'chunked')
-
+        del lines
+        del res
         res = self.request('GET', '/get/')
         self.assertEqual(res.status, 200)
-        self.assertEqual(res.read(), 'url=/get/\n')
+        lines = res.read().splitlines()
+        self.assertEqual(lines[0], 'url=/get/')
+        self.assertEqual(lines[1], 'Host=127.0.0.1:5000')
+        self.assertEqual(lines[2], 'Accept-Encoding=identity')
+        self.assertEqual(lines[3], 'total_headers=2')
         self.assertEqual(res.getheader('Transfer-Encoding'), 'chunked')
 
 if __name__ == '__main__':

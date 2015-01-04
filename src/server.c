@@ -229,7 +229,7 @@ int http_server_pop_client(http_server * srv, http_server_socket_t sock)
         if (it->sock == sock)
         {
             SLIST_REMOVE(&srv->clients, it, http_server_client, next);
-            free(it);
+            http_server_client_free(it);
             r = HTTP_SERVER_OK;
             break;
         }

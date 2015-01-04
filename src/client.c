@@ -4,6 +4,18 @@
 #include <strings.h>
 #include <assert.h>
 
+static void http_server__client_free_headers(http_server_client * client)
+{
+    while (!TAILQ_EMPTY(&client->headers))
+    {
+        struct http_server_header * header = TAILQ_FIRST(&client->headers);
+        TAILQ_REMOVE(&client->headers, header, headers);
+        free(header->key);
+        free(header->value);
+        free(header);
+    }
+}
+
 static int my_url_callback(http_parser * parser, const char * at, size_t length)
 {
     http_server_client * client = parser->data;
@@ -26,6 +38,7 @@ static int my_message_complete_callback(http_parser * parser)
         rv = client->handler->on_message_complete(client, client->handler->on_message_complete_data);
     }
     client->is_complete = 1;
+    http_server__client_free_headers(client);
     return rv;
 }
 
@@ -39,6 +52,166 @@ static int my_on_body(http_parser * parser, const char * at, size_t length)
         rv = client->handler->on_body(client, client->handler->on_body_data, at, length);
     }
     return rv;
+}
+
+static int my_on_header_field(http_parser * parser, const char * at, size_t length)
+{
+    http_server_client * client = parser->data;
+    int result;
+    if (client->header_state_ == 'S')
+    {
+        if (client->header_field_len_ + length >= client->header_field_size_)
+        {
+            char * new_field = realloc(client->header_field_, sizeof(char) * (client->header_field_size_ + length + 1));
+            if (!new_field)
+            {
+                abort();
+            }
+            client->header_field_ = new_field;
+            client->header_field_size_ += length;
+        }
+        int current_len = client->header_field_len_;
+        memcpy(client->header_field_ + current_len, at, length);
+        client->header_field_[current_len + length] = '\0';
+        client->header_field_len_ += length;
+    }
+    else if (client->header_state_ == 'V')
+    {
+        // We have field and value.
+        struct http_server_header * new_header = malloc(sizeof(struct http_server_header));
+        if (!new_header)
+        {
+            abort();
+        }
+        // Move temporary fields into new header structure
+        new_header->key = client->header_field_;
+        new_header->key_size = client->header_field_size_;
+        new_header->value = client->header_value_;
+        new_header->value_size = client->header_value_size_;
+        fprintf(stderr, "new header key[%.*s] value[%.*s]\n", new_header->key_size, new_header->key, new_header->value_size, new_header->value);
+        TAILQ_INSERT_TAIL(&client->headers, new_header, headers);
+        if (client->handler && client->handler->on_header)
+        {
+            result = client->handler->on_header(client, client->handler->on_header_data, new_header->key, new_header->value);
+        }
+        // Clear out pointers to allow new fields to be populated 
+        client->header_field_ = NULL;
+        client->header_field_size_ = 0;
+        client->header_field_len_ = 0;
+        client->header_value_ = NULL;
+        client->header_value_size_ = 0;
+        client->header_value_len_ = 0;
+
+        if (client->header_field_len_ + length >= client->header_field_size_)
+        {
+            char * new_field = realloc(client->header_field_, sizeof(char) * (client->header_field_size_ + length + 1));
+            if (!new_field)
+            {
+                abort();
+            }
+            client->header_field_ = new_field;
+            client->header_field_size_ += length;
+        }
+        int current_len = client->header_field_len_;
+        memcpy(client->header_field_ + current_len, at, length);
+        client->header_field_len_ += length;
+        client->header_field_[current_len + length] = '\0';
+    }
+    else if (client->header_state_ == 'F')
+    {
+        if (client->header_field_len_ + length >= client->header_field_size_)
+        {
+            char * new_field = realloc(client->header_field_, sizeof(char) * (client->header_field_size_ + length + 1));
+            if (!new_field)
+            {
+                abort();
+            }
+            client->header_field_ = new_field;
+            client->header_field_size_ += length;
+        }
+        int current_len = client->header_field_len_;
+        memcpy(client->header_field_ + current_len, at, length);
+        client->header_field_[current_len + length] = '\0';
+        client->header_field_len_ += length;
+    }
+    client->header_state_ = 'F';
+    return result;
+}
+
+static int my_on_header_value(http_parser * parser, const char * at, size_t length)
+{
+    http_server_client * client = parser->data;
+    if (client->header_state_ == 'F')
+    {
+        if (client->header_value_len_ + length >= client->header_value_size_)
+        {
+            char * new_field = realloc(client->header_value_, sizeof(char) * (client->header_value_size_ + length + 1));
+            if (!new_field)
+            {
+                abort();
+            }
+            client->header_value_ = new_field;
+            client->header_value_size_ += length;
+        }
+        int current_len = client->header_value_len_;
+        memcpy(client->header_value_ + current_len, at, length);
+        client->header_value_[current_len + length] = '\0';
+        client->header_value_len_ += length;
+    }
+    else if (client->header_state_ == 'V')
+    {
+        if (client->header_value_len_ + length >= client->header_value_size_)
+        {
+            char * new_field = realloc(client->header_value_, sizeof(char) * (client->header_value_size_ + length + 1));
+            if (!new_field)
+            {
+                abort();
+            }
+            client->header_value_ = new_field;
+            client->header_value_size_ += length;
+        }
+        int current_len = client->header_value_len_;
+        memcpy(client->header_value_ + current_len, at, length);
+        client->header_value_[current_len + length] = '\0';
+        client->header_value_len_ += length;
+    }
+    client->header_state_ = 'V';
+    return 0;
+}
+
+int my_on_headers_complete(http_parser * parser)
+{
+    http_server_client * client = parser->data;
+    if (client->header_state_ != 'V')
+    {
+        return 0;
+    }
+
+    struct http_server_header * new_header = malloc(sizeof(struct http_server_header));
+    if (!new_header)
+    {
+        abort();
+    }
+    // Move temporary fields into new header structure
+    new_header->key = client->header_field_;
+    new_header->key_size = client->header_field_size_;
+    new_header->value = client->header_value_;
+    new_header->value_size = client->header_value_size_;
+    // Clean up memory, because this client instance might be reused.
+    client->header_field_ = NULL;
+    client->header_field_size_ = 0;
+    client->header_field_len_ = 0;
+    client->header_value_ = NULL;
+    client->header_value_size_ = 0;
+    client->header_value_len_ = 0;
+    client->header_state_ = 'S';
+    fprintf(stderr, "new header key[%.*s] value[%.*s]\n", new_header->key_size, new_header->key, new_header->value_size, new_header->value);
+    TAILQ_INSERT_TAIL(&client->headers, new_header, headers);
+    if (client->handler && client->handler->on_header)
+    {
+        return client->handler->on_header(client, client->handler->on_header_data, new_header->key, new_header->value);
+    }
+    return 0;
 }
 
 http_server_client * http_server_new_client(http_server * server, http_server_socket_t sock, http_server_handler * handler)
@@ -55,12 +228,31 @@ http_server_client * http_server_new_client(http_server * server, http_server_so
     client->parser_settings_.on_url = &my_url_callback;
     client->parser_settings_.on_body = &my_on_body;
     client->parser_settings_.on_message_complete = &my_message_complete_callback;
+    client->parser_settings_.on_header_field = &my_on_header_field;
+    client->parser_settings_.on_header_value = &my_on_header_value;
+    client->parser_settings_.on_headers_complete = &my_on_headers_complete;
     // Response should be NULL so we know when to poll for WRITE
     client->current_response_ = NULL;
     client->server_ = server;
     client->current_flags = 0;
     client->is_complete = 0;
+    // Initialize request headers
+    TAILQ_INIT(&client->headers);
+    // Temporary data for incomming request headers
+    client->header_state_ = 'S';
+    client->header_field_ = NULL;
+    client->header_field_len_ = 0;
+    client->header_field_size_ = 0;
+    client->header_value_ = NULL;
+    client->header_value_len_ = 0;
+    client->header_value_size_ = 0;
     return client;
+}
+
+void http_server_client_free(http_server_client * client)
+{
+    http_server__client_free_headers(client);
+    free(client);
 }
 
 int http_server_perform_client(http_server_client * client, const char * at, size_t size)

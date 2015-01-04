@@ -9,7 +9,17 @@ typedef struct
 {
     char url[1024];
     char body[1024];
+    int headers_received;
 } http_server_request;
+
+http_server_request * create_request(void)
+{
+    http_server_request * req = malloc(sizeof(http_server_request));
+    memset(req->url, '\0', sizeof(req->url));
+    memset(req->body, '\0', sizeof(req->body));
+    req->headers_received = 0;
+    return req;
+}
 
 #define ASSERT(expr) do { if (!(expr)) { fprintf(stderr, "Error! assert(" #expr ") failed.\n"); abort(); }} while (0)
 
@@ -18,7 +28,7 @@ int on_url(http_server_client * client, void * data, const char * buf, size_t si
     http_server_request * request = client->data;
     if (!request)
     {
-        client->data = calloc(1, sizeof(http_server_request));
+        client->data = create_request();
         request = client->data;
     }
     fprintf(stderr, "URL chunk: %.*s\n", (int)size, buf);
@@ -31,6 +41,13 @@ int on_body(http_server_client * client, void * data, const char * buf, size_t s
     http_server_request * request = client->data;
     assert(request);
     strncpy(request->body, buf, size);
+    return 0;
+}
+
+int on_header(http_server_client * client, void * data, const char * field, const char * value)
+{
+    http_server_request * request = client->data;
+    request->headers_received += 1;
     return 0;
 }
 
@@ -64,6 +81,14 @@ int on_message_complete(http_server_client * client, void * data)
             r = http_server_response_write_head(res, 200);
             ASSERT(r == HTTP_SERVER_OK);
             r = http_server_response_printf(res, "url=%s\n", req->url);
+            ASSERT(r == HTTP_SERVER_OK);
+            struct http_server_header * header;
+            TAILQ_FOREACH(header, &client->headers, headers)
+            {
+                r = http_server_response_printf(res, "%s=%s\n", header->key, header->value);
+                ASSERT(r == HTTP_SERVER_OK);
+            }
+            r = http_server_response_printf(res, "total_headers=%d\n", req->headers_received);
             ASSERT(r == HTTP_SERVER_OK);
         }
         else
@@ -125,6 +150,7 @@ int main(int argc, char * argv[])
     handler.on_url = &on_url;
     handler.on_message_complete = &on_message_complete;
     handler.on_body = &on_body;
+    handler.on_header = &on_header;
     if ((result = http_server_setopt(&srv, HTTP_SERVER_OPT_HANDLER, &handler)) != HTTP_SERVER_OK)
     {
         fprintf(stderr, "Unable to set handler: %s\n", http_server_errstr(result));

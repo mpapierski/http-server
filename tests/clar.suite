@@ -3,6 +3,9 @@ extern void test_test_response__without_chunked_response(void);
 extern void test_test_response__with_content_length(void);
 extern void test_test_errors__invalid_error(void);
 extern void test_test_errors__check_messages(void);
+extern void test_strings__append(void);
+extern void test_strings__initialize(void);
+extern void test_strings__cleanup(void);
 extern void test_test_http_server__setopt(void);
 extern void test_test_http_server__start(void);
 extern void test_test_http_server__manage_clients(void);
@@ -17,12 +20,21 @@ static const struct clar_func _clar_cb_test_errors[] = {
     { "invalid_error", &test_test_errors__invalid_error },
     { "check_messages", &test_test_errors__check_messages }
 };
+static const struct clar_func _clar_cb_strings[] = {
+    { "append", &test_strings__append }
+};
 static const struct clar_func _clar_cb_test_http_server[] = {
     { "setopt", &test_test_http_server__setopt },
     { "start", &test_test_http_server__start },
     { "manage_clients", &test_test_http_server__manage_clients }
 };
 static struct clar_suite _clar_suites[] = {
+    {
+        "strings",
+        { "initialize", &test_strings__initialize },
+        { "cleanup", &test_strings__cleanup },
+        _clar_cb_strings, 1, 1
+    },
     {
         "test::errors",
         { NULL, NULL },
@@ -42,5 +54,5 @@ static struct clar_suite _clar_suites[] = {
         _clar_cb_test_response, 3, 1
     }
 };
-static const size_t _clar_suite_count = 3;
-static const size_t _clar_callback_count = 8;
+static const size_t _clar_suite_count = 4;
+static const size_t _clar_callback_count = 9;

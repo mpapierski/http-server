@@ -39,6 +39,7 @@ add_executable (test_suite
     test_response.c
     test_errors.c
     test_http_server.c
+    strings.c
     clar.c
     clar.h
     main.c)

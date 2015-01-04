@@ -33,6 +33,36 @@ typedef enum {
 } http_server_option;
 
 /**
+ * String representation
+ */
+typedef struct
+{
+    char * buf;
+    int len;
+    int size;
+} http_server_string;
+
+/**
+ * Creates new string
+ */
+void http_server_string_init(http_server_string * str);
+
+/**
+ * Free memory allocated by string
+ */
+void http_server_string_free(http_server_string * str);
+
+/**
+ * Append data to the string
+ */
+int http_server_string_append(http_server_string * str, char * data, int size);
+
+/**
+ * Get string representation
+ */
+const char * http_server_string_str(http_server_string * str);
+
+/**
  * Callback that will be called whenever http-server requests
  * new socket. At this point it is up to user to set socket's
  * purpse. It could be UDP or TCP (or some abstract type)
@@ -212,7 +242,8 @@ typedef struct http_server
     XX(SOCKET_EXISTS, 3, "Socket is already managed") \
     XX(INVALID_PARAM, 4, "Invalid parameter") \
     XX(CLIENT_EOF, 5, "End of file") \
-    XX(PARSER_ERROR, 6, "Unable to parse HTTP request")
+    XX(PARSER_ERROR, 6, "Unable to parse HTTP request") \
+    XX(NO_MEMORY, 7, "Cannot allocate memory")
 
 #define HTTP_SERVER_ENUM_ERRNO(name, val, descr) \
     HTTP_SERVER_ ## name = val,

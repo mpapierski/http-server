@@ -15,5 +15,6 @@ void test_test_errors__check_messages(void)
     cl_assert_equal_s(http_server_errstr(HTTP_SERVER_SOCKET_EXISTS), "Socket is already managed");
     cl_assert_equal_s(http_server_errstr(HTTP_SERVER_INVALID_PARAM), "Invalid parameter");
     cl_assert_equal_s(http_server_errstr(HTTP_SERVER_CLIENT_EOF), "End of file");
-    cl_assert_equal_s(http_server_errstr(HTTP_SERVER_PARSER_ERROR), "Unable to parse HTTP request");	
+    cl_assert_equal_s(http_server_errstr(HTTP_SERVER_PARSER_ERROR), "Unable to parse HTTP request");
+    cl_assert_equal_s(http_server_errstr(HTTP_SERVER_NO_MEMORY), "Cannot allocate memory");
 }

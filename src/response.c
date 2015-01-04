@@ -26,13 +26,13 @@ static int _response_add_buffer(http_server_response * res, char * data, int siz
     http_server_buf * new_buffer = malloc(sizeof(http_server_buf));
     if (!new_buffer)
     {
-        return -1;
+        return HTTP_SERVER_NO_MEMORY;
     }
     new_buffer->mem = new_buffer->data = malloc(size + 1);
     if (!new_buffer->data)
     {
         free(new_buffer);
-        return -1;
+        return HTTP_SERVER_NO_MEMORY;
     }
     memcpy(new_buffer->data, data, size);
     new_buffer->data[size] = '\0';
@@ -65,7 +65,7 @@ http_server_response * http_server_response_new()
 
 void http_server_response_free(http_server_response * res)
 {
-    if (res == 0)
+    if (res == NULL)
     {
         return;
     }
@@ -79,13 +79,11 @@ void http_server_response_free(http_server_response * res)
         free(buf);
     }
     // Free headers
-    struct http_server_header * header;
-    TAILQ_FOREACH(header, &res->headers, headers)
+    while (!TAILQ_EMPTY(&res->headers))
     {
+        struct http_server_header * header = TAILQ_FIRST(&res->headers);
         TAILQ_REMOVE(&res->headers, header, headers);
-        http_server_string_free(&header->field);
-        http_server_string_free(&header->value);
-        free(header);
+        http_server_header_free(header);
     }
     free(res);
 }
@@ -130,19 +128,16 @@ int http_server_response_write_head(http_server_response * res, int status_code)
     int head_len = -1;
 #define XX(code, name, description) \
     case code: \
-        head_len = sprintf(head, "HTTP/1.1 %d %s\r\n", code, description); \
+        head_len = snprintf(head, sizeof(head), "HTTP/1.1 %d %s\r\n", code, description); \
         break;
     switch (status_code)
     {
     HTTP_SERVER_ENUM_STATUS_CODES(XX)
     default:
-        assert(!"Unknown status code");
-        break;
+        return HTTP_SERVER_INVALID_PARAM;
     }
-    assert(head_len != -1);
     int r = _response_add_buffer(res, head, head_len);
-    assert(r != -1);
-    return HTTP_SERVER_OK;
+    return r;
 #undef XX
 }
 
@@ -236,10 +231,18 @@ int http_server_response_write(http_server_response * res, char * data, int size
     if (res->is_chunked)
     {
         // Create chunked encoding frame
-        char * frame = malloc(1024 + size);
-        int frame_length = sprintf(frame, "%x\r\n%.*s\r\n", size, size, data);
+        char * frame = NULL;
+        int frame_length = asprintf(&frame, "%x\r\n%.*s\r\n", size, size, data);
+        if (frame_length == -1)
+        {
+            return HTTP_SERVER_NO_MEMORY;
+        }
         int r = _response_add_buffer(res, frame, frame_length);
-        assert(r == 0);
+        if (r != HTTP_SERVER_OK)
+        {
+            free(frame);
+            return r;
+        }
         free(frame);
     }
     else
@@ -251,7 +254,10 @@ int http_server_response_write(http_server_response * res, char * data, int size
             return http_server_response__flush(res);
         }
         int r = _response_add_buffer(res, data, size);
-        assert(r == 0);
+        if (r != HTTP_SERVER_OK)
+        {
+            return r;
+        }
     }
     return http_server_response__flush(res);
 }
@@ -262,7 +268,11 @@ int http_server_response_printf(http_server_response * res, const char * format,
     va_start(args, format);
     char * buffer = NULL;
     int result = vasprintf(&buffer, format, args);
-    assert(buffer);
+    if (result == -1)
+    {
+        va_end(args);
+        return HTTP_SERVER_NO_MEMORY;
+    }
     int r = http_server_response_write(res, buffer, result);
     free(buffer);
     va_end(args);

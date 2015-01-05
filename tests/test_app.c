@@ -55,7 +55,8 @@ int on_message_complete(http_server_client * client, void * data)
     assert(url);
     if (strncmp(url, "/set-headers/", 13) == 0)
     {
-        for (int i = 0; i < 10; ++i)
+        int i;
+        for (i = 0; i < 10; ++i)
         {
             char key[16], value[16];
             int key_size = snprintf(key, sizeof(key), "Key%d", i);

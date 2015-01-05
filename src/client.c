@@ -187,6 +187,7 @@ void http_server_client_free(http_server_client * client)
     http_server__client_free_headers(client);
     http_server_string_free(&client->header_field_);
     http_server_string_free(&client->header_value_);
+    http_server_string_free(&client->url);
     free(client);
 }
 

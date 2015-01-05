@@ -53,7 +53,7 @@ int on_message_complete(http_server_client * client, void * data)
     r = http_server_response_begin(client, res);
     ASSERT(r == HTTP_SERVER_OK);
     assert(url);
-    if (strncmp(url, "/set-headers/", 13) == 0)
+    if (strcmp(url, "/set-headers/") == 0)
     {
         int i;
         for (i = 0; i < 10; ++i)
@@ -69,7 +69,7 @@ int on_message_complete(http_server_client * client, void * data)
         r = http_server_response_printf(res, "url=%s\n", url);
         ASSERT(r == HTTP_SERVER_OK);
     }
-    else if (strncmp(url, "/get/", 5) == 0)
+    else if (strcmp(url, "/get/") == 0)
     {
         if (client->parser_.method == HTTP_GET)
         {
@@ -92,7 +92,7 @@ int on_message_complete(http_server_client * client, void * data)
             ASSERT(r == HTTP_SERVER_OK);
         }
     }
-    else if (strncmp(url, "/post/", 6) == 0)
+    else if (strcmp(url, "/post/") == 0)
     {
         if (client->parser_.method == HTTP_POST)
         {
@@ -107,7 +107,7 @@ int on_message_complete(http_server_client * client, void * data)
             ASSERT(r == HTTP_SERVER_OK);
         }
     }
-    else if (strncmp(url, "/cancel/", 8) == 0)
+    else if (strcmp(url, "/cancel/") == 0)
     {
         int result = http_server_cancel(client->server_);
         r = http_server_response_write_head(res, 200);

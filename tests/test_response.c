@@ -2,19 +2,46 @@
 #include "http-server/http-server.h"
 #include <stdio.h>
 #include <strings.h>
+#include <sys/socket.h>
+#include <unistd.h>
 
 const char * content_length = "Content-Length";
+
+int client_fds[2];
+http_server server;
+http_server_handler handler;
+http_server_client * client;
+
+void test_test_response__initialize(void)
+{
+    int r = socketpair(PF_LOCAL, SOCK_STREAM, 0, client_fds);
+    if (r == -1) cl_fail("unable to create socketpair");
+
+    http_server_init(&server);
+    http_server_handler_init(&handler);
+    client = http_server_new_client(&server, client_fds[0], &handler);
+}
+
+void test_test_response__cleanup(void)
+{
+    http_server_free(&server);
+    //http_server_handler_free(&server);
+    http_server_client_free(client);
+    close(client_fds[0]);
+    close(client_fds[1]);
+}
 
 void http_response_write_head_test(int code, const char * message)
 {   
     http_server_response * res = http_server_response_new();
+    http_server_response_begin(client, res);
     http_server_response_write_head(res, code);
     http_server_response_write(res, NULL, 0); // empty response
 
     char expected[1024];
     sprintf(expected, "HTTP/1.1 %d %s\r\n", code, message);
 
-    struct http_server_buf * buf = TAILQ_FIRST(&res->buffer);
+    struct http_server_buf * buf = TAILQ_FIRST(&client->buffer);
     cl_assert(!!buf);
     cl_assert_equal_s(buf->data, expected);
     buf = TAILQ_NEXT(buf, bufs);
@@ -126,6 +153,7 @@ void test_test_response__without_chunked_response(void)
     //test_http_response_enum();
 
     http_server_response * res = http_server_response_new();
+    cl_assert_equal_i(http_server_response_begin(client, res), HTTP_SERVER_OK);
     // by default http response is chunked
     cl_assert_equal_i(res->is_chunked, 1);
     cl_assert(!TAILQ_EMPTY(&res->headers));
@@ -162,7 +190,7 @@ void test_test_response__without_chunked_response(void)
     cl_assert_equal_i(res->headers_sent, 1);
     cl_assert(TAILQ_EMPTY(&res->headers));
     // check for buffer frames
-    struct http_server_buf * buf = TAILQ_FIRST(&res->buffer);
+    struct http_server_buf * buf = TAILQ_FIRST(&client->buffer);
     cl_assert(!!buf);
     cl_assert_equal_s(buf->data, "HTTP/1.1 200 OK\r\n");
     buf = TAILQ_NEXT(buf, bufs);
@@ -198,8 +226,8 @@ void test_test_response__with_content_length(void)
     //#undef XX
 //
     //test_http_response_enum();
-
     http_server_response * res = http_server_response_new();
+    cl_assert_equal_i(http_server_response_begin(client, res), HTTP_SERVER_OK);
     // by default http response is chunked
     cl_assert_equal_i(res->is_chunked, 1);
     cl_assert(!TAILQ_EMPTY(&res->headers));
@@ -237,7 +265,7 @@ void test_test_response__with_content_length(void)
     cl_assert_equal_i(res->headers_sent, 1);
     cl_assert(TAILQ_EMPTY(&res->headers));
     // check for buffer frames
-    struct http_server_buf * buf = TAILQ_FIRST(&res->buffer);
+    struct http_server_buf * buf = TAILQ_FIRST(&client->buffer);
     cl_assert(!!buf);
     cl_assert_equal_s(buf->data, "HTTP/1.1 200 OK\r\n");
     buf = TAILQ_NEXT(buf, bufs);

@@ -156,7 +156,6 @@ typedef struct http_server_response
     // Owner. Could be NULL in case the response is not tied to
     // a particular client.
     struct http_server_client * client;
-    TAILQ_HEAD(slisthead2, http_server_buf) buffer;
     int headers_sent; // are headers sent yet?
     TAILQ_HEAD(http_server_headers, http_server_header) headers;
     int is_chunked;
@@ -181,6 +180,8 @@ typedef struct http_server_client
     struct http_server * server_;
     int current_flags; // current I/O poll flags
     int is_complete; // request is complete
+    // All outgoing data
+    TAILQ_HEAD(http_server_client__buffer, http_server_buf) buffer;
     // URL of the request
     http_server_string url;
     // all incomming http headers
@@ -370,6 +371,17 @@ typedef enum
 int http_server_client_getinfo(http_server_client * client, http_server_clientinfo, ...);
 
 /**
+ * Queue raw data to client socket
+ */
+int http_server_client_write(http_server_client * client, char * data, int size);
+
+/**
+ * Flush outgoing data queued on client
+ */
+int http_server_client_flush(http_server_client * client);
+
+
+/**
  * Feeds client using chunk of datad    
  */
 int http_server_perform_client(http_server_client * client, const char * at, size_t size);
@@ -483,6 +495,5 @@ int http_server_response_write(http_server_response * res, char * data, int size
  * Write some data to the response similiar to a printf(3) call.
  */
 int http_server_response_printf(http_server_response * res, const char * format, ...);
-
 
 #endif

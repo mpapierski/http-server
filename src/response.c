@@ -21,26 +21,6 @@ static int http_server_header_cmp(struct http_server_header * lhs, struct http_s
     return tolower(*a)-tolower(*b);
 }
 
-static int _response_add_buffer(http_server_response * res, char * data, int size)
-{
-    http_server_buf * new_buffer = malloc(sizeof(http_server_buf));
-    if (!new_buffer)
-    {
-        return HTTP_SERVER_NO_MEMORY;
-    }
-    new_buffer->mem = new_buffer->data = malloc(size + 1);
-    if (!new_buffer->data)
-    {
-        free(new_buffer);
-        return HTTP_SERVER_NO_MEMORY;
-    }
-    memcpy(new_buffer->data, data, size);
-    new_buffer->data[size] = '\0';
-    new_buffer->size = size;
-    TAILQ_INSERT_TAIL(&res->buffer, new_buffer, bufs);
-    return 0;
-}
-
 http_server_response * http_server_response_new()
 {
     http_server_response * res = malloc(sizeof(http_server_response)); 
@@ -48,7 +28,6 @@ http_server_response * http_server_response_new()
     {
         return 0;
     }
-    TAILQ_INIT(&res->buffer);
     // Initialize output headers
     res->headers_sent = 0;
     TAILQ_INIT(&res->headers);
@@ -68,15 +47,6 @@ void http_server_response_free(http_server_response * res)
     if (res == NULL)
     {
         return;
-    }
-    // Free queued buffers
-    while (!TAILQ_EMPTY(&res->buffer))
-    {
-        http_server_buf * buf = TAILQ_FIRST(&res->buffer);
-        assert(buf);
-        TAILQ_REMOVE(&res->buffer, buf, bufs);
-        free(buf->mem);
-        free(buf);
     }
     // Free headers
     while (!TAILQ_EMPTY(&res->headers))
@@ -113,15 +83,6 @@ int http_server_response_end(http_server_response * res)
     return http_server_response_write(res, NULL, 0);
 }
 
-int http_server_response__flush(http_server_response * res)
-{
-    if (TAILQ_EMPTY(&res->buffer))
-    {
-        return HTTP_SERVER_OK;
-    }
-    return http_server_poll_client(res->client, HTTP_SERVER_POLL_OUT);
-}
-
 int http_server_response_write_head(http_server_response * res, int status_code)
 {
     char head[1024];
@@ -136,7 +97,7 @@ int http_server_response_write_head(http_server_response * res, int status_code)
     default:
         return HTTP_SERVER_INVALID_PARAM;
     }
-    int r = _response_add_buffer(res, head, head_len);
+    int r = http_server_client_write(res->client, head, head_len);
     return r;
 #undef XX
 }
@@ -212,7 +173,7 @@ int http_server_response_write(http_server_response * res, char * data, int size
             struct http_server_header * header = TAILQ_FIRST(&res->headers);
             char data[1024];
             int data_len = sprintf(data, "%s: %s\r\n", http_server_string_str(&header->field), http_server_string_str(&header->value));
-            int r = _response_add_buffer(res, data, data_len);
+            int r = http_server_client_write(res->client, data, data_len);
             // Remove first header from the queue
             TAILQ_REMOVE(&res->headers, header, headers);
             http_server_header_free(header);
@@ -221,7 +182,8 @@ int http_server_response_write(http_server_response * res, char * data, int size
                 return r;
             }
         }
-        int r = _response_add_buffer(res, "\r\n", 2);
+        assert(res->client);
+        int r = http_server_client_write(res->client, "\r\n", 2);
         if (r != HTTP_SERVER_OK)
         {
             return r;
@@ -237,7 +199,8 @@ int http_server_response_write(http_server_response * res, char * data, int size
         {
             return HTTP_SERVER_NO_MEMORY;
         }
-        int r = _response_add_buffer(res, frame, frame_length);
+        assert(res->client);
+        int r = http_server_client_write(res->client, frame, frame_length);
         if (r != HTTP_SERVER_OK)
         {
             free(frame);
@@ -251,15 +214,15 @@ int http_server_response_write(http_server_response * res, char * data, int size
         if (!data || size == 0)
         {
             // Do nothing - called once will create empty response.
-            return http_server_response__flush(res);
+            return http_server_client_flush(res->client);
         }
-        int r = _response_add_buffer(res, data, size);
+        int r = http_server_client_write(res->client, data, size);
         if (r != HTTP_SERVER_OK)
         {
             return r;
         }
     }
-    return http_server_response__flush(res);
+    return http_server_client_flush(res->client);
 }
 
 int http_server_response_printf(http_server_response * res, const char * format, ...)

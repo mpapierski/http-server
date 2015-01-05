@@ -366,7 +366,7 @@ int http_server_socket_action(http_server * srv, http_server_socket_t socket, in
             return HTTP_SERVER_SOCKET_ERROR;
         }
         http_server_response * res = client->current_response_;
-        assert(!TAILQ_EMPTY(&res->buffer));
+        assert(!TAILQ_EMPTY(&it->buffer));
         // Use scatter-gather I/O to deliver multiple chunks of data
         static const int maxiov =
 #if defined(MAXIOV)
@@ -380,7 +380,7 @@ int http_server_socket_action(http_server * srv, http_server_socket_t socket, in
         struct iovec wvec[maxiov];
         http_server_buf * buf;
         int iocnt = 0;
-        TAILQ_FOREACH(buf, &res->buffer, bufs)
+        TAILQ_FOREACH(buf, &it->buffer, bufs)
         {
             assert(buf);
             if (iocnt >= maxiov)
@@ -414,16 +414,16 @@ int http_server_socket_action(http_server * srv, http_server_socket_t socket, in
         // Pop buffers from response
         iocnt = 0;
         buf = NULL;
-        while (!TAILQ_EMPTY(&res->buffer))
+        while (!TAILQ_EMPTY(&it->buffer))
         {
-            buf = TAILQ_FIRST(&res->buffer);
+            buf = TAILQ_FIRST(&it->buffer);
             if (iocnt >= maxiov)
             {
                 break;
             }
             if (bytes_transferred >= buf->size)
             {
-                TAILQ_REMOVE(&res->buffer, buf, bufs);
+                TAILQ_REMOVE(&it->buffer, buf, bufs);
                 free(buf->mem);
                 bytes_transferred -= buf->size;
                 free(buf);
@@ -431,11 +431,11 @@ int http_server_socket_action(http_server * srv, http_server_socket_t socket, in
             iocnt++;
         }
         // It is possible that writev(2) will not write all data
-        if (bytes_transferred > 0 && !TAILQ_EMPTY(&res->buffer))
+        if (bytes_transferred > 0 && !TAILQ_EMPTY(&it->buffer))
         {
             // This is probably buggy
             fprintf(stderr, "truncate first buffer\n");
-            buf = TAILQ_FIRST(&res->buffer);
+            buf = TAILQ_FIRST(&it->buffer);
             if (bytes_transferred > buf->size)
             {
                 fprintf(stderr, "there is too much to truncate: %d > %d\n", (int)bytes_transferred, buf->size);
@@ -450,7 +450,7 @@ int http_server_socket_action(http_server * srv, http_server_socket_t socket, in
             bytes_transferred = 0;
         }
         // Poll again if there is any data left
-        if (!TAILQ_EMPTY(&res->buffer) && http_server_poll_client(it, HTTP_SERVER_POLL_OUT) != HTTP_SERVER_OK)
+        if (!TAILQ_EMPTY(&it->buffer) && http_server_poll_client(it, HTTP_SERVER_POLL_OUT) != HTTP_SERVER_OK)
         {
             return HTTP_SERVER_SOCKET_ERROR;
         }

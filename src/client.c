@@ -171,6 +171,8 @@ http_server_client * http_server_new_client(http_server * server, http_server_so
     client->server_ = server;
     client->current_flags = 0;
     client->is_complete = 0;
+    // Create new queue of outgoing chunks of data
+    TAILQ_INIT(&client->buffer);
     // Initialize string which will hold full URL data
     http_server_string_init(&client->url);
     // Initialize request headers
@@ -187,6 +189,16 @@ void http_server_client_free(http_server_client * client)
     http_server__client_free_headers(client);
     http_server_string_free(&client->header_field_);
     http_server_string_free(&client->header_value_);
+    // Free queued buffers
+    while (!TAILQ_EMPTY(&client->buffer))
+    {
+        http_server_buf * buf = TAILQ_FIRST(&client->buffer);
+        assert(buf);
+        TAILQ_REMOVE(&client->buffer, buf, bufs);
+        free(buf->mem);
+        free(buf);
+    }
+    // Free URL data
     http_server_string_free(&client->url);
     free(client);
 }
@@ -255,3 +267,37 @@ int http_server_client_getinfo(http_server_client * client, http_server_clientin
     }
     return HTTP_SERVER_OK;
 }
+
+int http_server_client_write(http_server_client * client, char * data, int size)
+{
+    if (!client)
+    {
+        return HTTP_SERVER_INVALID_PARAM;
+    }
+    http_server_buf * new_buffer = malloc(sizeof(http_server_buf));
+    if (!new_buffer)
+    {
+        return HTTP_SERVER_NO_MEMORY;
+    }
+    new_buffer->mem = new_buffer->data = malloc(size + 1);
+    if (!new_buffer->data)
+    {
+        free(new_buffer);
+        return HTTP_SERVER_NO_MEMORY;
+    }
+    memcpy(new_buffer->data, data, size);
+    new_buffer->data[size] = '\0';
+    new_buffer->size = size;
+    TAILQ_INSERT_TAIL(&client->buffer, new_buffer, bufs);
+    return HTTP_SERVER_OK;
+}
+
+int http_server_client_flush(http_server_client * client)
+{
+    if (TAILQ_EMPTY(&client->buffer))
+    {
+        return HTTP_SERVER_OK;
+    }
+    return http_server_poll_client(client, HTTP_SERVER_POLL_OUT);
+}
+

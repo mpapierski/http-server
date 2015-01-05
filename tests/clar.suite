@@ -1,6 +1,8 @@
 extern void test_test_response__enum(void);
 extern void test_test_response__without_chunked_response(void);
 extern void test_test_response__with_content_length(void);
+extern void test_test_response__initialize(void);
+extern void test_test_response__cleanup(void);
 extern void test_strings__append(void);
 extern void test_strings__clear(void);
 extern void test_strings__initialize(void);
@@ -65,8 +67,8 @@ static struct clar_suite _clar_suites[] = {
     },
     {
         "test::response",
-        { NULL, NULL },
-        { NULL, NULL },
+        { "initialize", &test_test_response__initialize },
+        { "cleanup", &test_test_response__cleanup },
         _clar_cb_test_response, 3, 1
     }
 };

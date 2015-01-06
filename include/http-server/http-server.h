@@ -189,6 +189,8 @@ typedef struct http_server_client
     char header_state_; // (S)tart,(F)ield,(V)alue
     http_server_string header_field_;
     http_server_string header_value_;
+    // all reading is paused
+    int is_paused_;
 } http_server_client;
 
 typedef struct http_server
@@ -380,6 +382,11 @@ int http_server_client_write(http_server_client * client, char * data, int size)
  */
 int http_server_client_flush(http_server_client * client);
 
+/**
+ * Pause further reading from client connection
+ * @param client Client
+ */
+int http_server_client_pause(http_server_client * client, int pause);
 
 /**
  * Feeds client using chunk of datad    

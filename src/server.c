@@ -351,7 +351,7 @@ int http_server_socket_action(http_server * srv, http_server_socket_t socket, in
                 return r;
             }
             fprintf(stderr, "is_complete: %d\n", it->is_complete);
-            if (!it->is_complete && http_server_poll_client(it, HTTP_SERVER_POLL_IN) != HTTP_SERVER_OK)
+            if (!it->is_paused_ && !it->is_complete && http_server_poll_client(it, HTTP_SERVER_POLL_IN) != HTTP_SERVER_OK)
             {
                 fprintf(stderr, "unable to poll in - request incomplete\n");
                 return HTTP_SERVER_SOCKET_ERROR;
@@ -451,7 +451,7 @@ int http_server_socket_action(http_server * srv, http_server_socket_t socket, in
         // If user finishes the response with `http_server_response_end` then
         // it is clear when to proceed to the next response.
         http_server_response * res = client->current_response_;
-        if (res && res->is_done)
+        if (!client->is_paused_ && res && res->is_done)
         {
             // All response data is sent now. No need to hold this memory,
             // and allow next requests inside the same connection to create

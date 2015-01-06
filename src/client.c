@@ -205,6 +205,7 @@ http_server_client * http_server_new_client(http_server * server, http_server_so
     client->header_state_ = 'S';
     http_server_string_init(&client->header_field_);
     http_server_string_init(&client->header_value_);
+    client->is_paused_ = 0;
     return client;
 }
 
@@ -263,6 +264,11 @@ int http_server_poll_client(http_server_client * client, int flags)
         // To save calls to user provided callbacks ignore
         // a case when I/O poll flags didnt changed.
         return HTTP_SERVER_OK;
+    }
+    //assert(client->current_flags & HTTP_SERVER_POLL_OUT )
+    if (client->current_flags & HTTP_SERVER_POLL_IN)
+    {
+        assert(!client->is_paused_);
     }
     if (client->server_->socket_func(client->server_->socket_data, client->sock, client->current_flags, client->data) != HTTP_SERVER_OK)
     {
@@ -325,3 +331,20 @@ int http_server_client_flush(http_server_client * client)
     return http_server_poll_client(client, HTTP_SERVER_POLL_OUT);
 }
 
+int http_server_client_pause(http_server_client * client, int pause)
+{
+    if (!client)
+    {
+        return HTTP_SERVER_INVALID_PARAM;
+    }
+    int previous_state = client->is_paused_;
+    fprintf(stderr, "change paused on %d from %d->%d\n", client->sock, previous_state, pause);
+    client->is_paused_ = pause;
+    // If paused state is enabled after it was disabled then we try
+    // to read data again.
+    if (previous_state == 1 && pause == 0)
+    {
+        return http_server_poll_client(client, HTTP_SERVER_POLL_IN);
+    }
+    return HTTP_SERVER_OK;
+}

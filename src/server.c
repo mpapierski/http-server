@@ -360,12 +360,6 @@ int http_server_socket_action(http_server * srv, http_server_socket_t socket, in
     }
     if (flags & HTTP_SERVER_POLL_OUT)
     {
-        if (!client->current_response_)
-        {
-            fprintf(stderr, "Poll out but no response set in client %d\n", client->sock);
-            return HTTP_SERVER_SOCKET_ERROR;
-        }
-        http_server_response * res = client->current_response_;
         assert(!TAILQ_EMPTY(&it->buffer));
         // Use scatter-gather I/O to deliver multiple chunks of data
         static const int maxiov =
@@ -380,7 +374,7 @@ int http_server_socket_action(http_server * srv, http_server_socket_t socket, in
         struct iovec wvec[maxiov];
         http_server_buf * buf;
         int iocnt = 0;
-        TAILQ_FOREACH(buf, &it->buffer, bufs)
+        TAILQ_FOREACH(buf, &client->buffer, bufs)
         {
             assert(buf);
             if (iocnt >= maxiov)
@@ -414,16 +408,16 @@ int http_server_socket_action(http_server * srv, http_server_socket_t socket, in
         // Pop buffers from response
         iocnt = 0;
         buf = NULL;
-        while (!TAILQ_EMPTY(&it->buffer))
+        while (!TAILQ_EMPTY(&client->buffer))
         {
-            buf = TAILQ_FIRST(&it->buffer);
+            buf = TAILQ_FIRST(&client->buffer);
             if (iocnt >= maxiov)
             {
                 break;
             }
             if (bytes_transferred >= buf->size)
             {
-                TAILQ_REMOVE(&it->buffer, buf, bufs);
+                TAILQ_REMOVE(&client->buffer, buf, bufs);
                 free(buf->mem);
                 bytes_transferred -= buf->size;
                 free(buf);
@@ -431,11 +425,11 @@ int http_server_socket_action(http_server * srv, http_server_socket_t socket, in
             iocnt++;
         }
         // It is possible that writev(2) will not write all data
-        if (bytes_transferred > 0 && !TAILQ_EMPTY(&it->buffer))
+        if (bytes_transferred > 0 && !TAILQ_EMPTY(&client->buffer))
         {
             // This is probably buggy
             fprintf(stderr, "truncate first buffer\n");
-            buf = TAILQ_FIRST(&it->buffer);
+            buf = TAILQ_FIRST(&client->buffer);
             if (bytes_transferred > buf->size)
             {
                 fprintf(stderr, "there is too much to truncate: %d > %d\n", (int)bytes_transferred, buf->size);
@@ -450,23 +444,24 @@ int http_server_socket_action(http_server * srv, http_server_socket_t socket, in
             bytes_transferred = 0;
         }
         // Poll again if there is any data left
-        if (!TAILQ_EMPTY(&it->buffer) && http_server_poll_client(it, HTTP_SERVER_POLL_OUT) != HTTP_SERVER_OK)
+        if (!TAILQ_EMPTY(&client->buffer) && http_server_poll_client(client, HTTP_SERVER_POLL_OUT) != HTTP_SERVER_OK)
         {
             return HTTP_SERVER_SOCKET_ERROR;
         }
         // If user finishes the response with `http_server_response_end` then
         // it is clear when to proceed to the next response.
-        if (res->is_done)
+        http_server_response * res = client->current_response_;
+        if (res && res->is_done)
         {
             // All response data is sent now. No need to hold this memory,
             // and allow next requests inside the same connection to create
             // new responses.
             http_server_response_free(res);
-            it->current_response_ = NULL;
+            client->current_response_ = NULL;
             // All response is sent. Poll again for new request
-            if (http_server_poll_client(it, HTTP_SERVER_POLL_IN) != HTTP_SERVER_OK)
+            if (http_server_poll_client(client, HTTP_SERVER_POLL_IN) != HTTP_SERVER_OK)
             {
-                fprintf(stderr, "unable to poll in for next request on client %d\n", it->sock);
+                fprintf(stderr, "unable to poll in for next request on client %d\n", client->sock);
                 return HTTP_SERVER_SOCKET_ERROR;
             }
         }

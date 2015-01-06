@@ -64,11 +64,7 @@ int http_server_response_begin(http_server_client * client, http_server_response
     assert(!client->current_response_);
     res->client = client;
     client->current_response_ = res;
-    if (http_server_poll_client(client, HTTP_SERVER_POLL_OUT) != HTTP_SERVER_OK)
-    {
-        return HTTP_SERVER_SOCKET_ERROR;
-    }
-    return HTTP_SERVER_OK;
+    return http_server_client_flush(client);
 }
 
 int http_server_response_end(http_server_response * res)

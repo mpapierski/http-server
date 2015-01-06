@@ -9,6 +9,7 @@ extern void test_strings__initialize(void);
 extern void test_strings__cleanup(void);
 extern void test_client__getinfo_empty(void);
 extern void test_client__getinfo(void);
+extern void test_client__write(void);
 extern void test_client__initialize(void);
 extern void test_client__cleanup(void);
 extern void test_test_errors__invalid_error(void);
@@ -29,7 +30,8 @@ static const struct clar_func _clar_cb_strings[] = {
 };
 static const struct clar_func _clar_cb_client[] = {
     { "getinfo_empty", &test_client__getinfo_empty },
-    { "getinfo", &test_client__getinfo }
+    { "getinfo", &test_client__getinfo },
+    { "write", &test_client__write }
 };
 static const struct clar_func _clar_cb_test_errors[] = {
     { "invalid_error", &test_test_errors__invalid_error },
@@ -45,7 +47,7 @@ static struct clar_suite _clar_suites[] = {
         "client",
         { "initialize", &test_client__initialize },
         { "cleanup", &test_client__cleanup },
-        _clar_cb_client, 2, 1
+        _clar_cb_client, 3, 1
     },
     {
         "strings",
@@ -73,4 +75,4 @@ static struct clar_suite _clar_suites[] = {
     }
 };
 static const size_t _clar_suite_count = 5;
-static const size_t _clar_callback_count = 12;
+static const size_t _clar_callback_count = 13;

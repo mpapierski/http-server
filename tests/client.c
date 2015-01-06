@@ -35,3 +35,17 @@ void test_client__getinfo(void)
 	cl_assert(url);
 	cl_assert_equal_s(url, "/get/");
 }
+
+void test_client__write(void)
+{
+	cl_assert(TAILQ_EMPTY(&client->buffer));
+	cl_assert_equal_i(http_server_client_write(client, "Hello", 5), HTTP_SERVER_OK);
+	cl_assert(!TAILQ_EMPTY(&client->buffer));
+	int i = 0;
+	http_server_buf * buf;
+	TAILQ_FOREACH(buf, &client->buffer, bufs)
+	{
+		i++;
+	}
+	cl_assert_equal_i(i, 1);
+}

@@ -140,13 +140,37 @@ int my_on_headers_complete(http_parser * parser)
     http_server_string_move(&client->header_value_, &new_header->value);
     // Clean up memory, because this client instance might be reused.
     client->header_state_ = 'S';
-    fprintf(stderr, "new header key[%s] value[%s]\n", http_server_string_str(&new_header->field), http_server_string_str(&new_header->value));
     TAILQ_INSERT_TAIL(&client->headers, new_header, headers);
+    int r = 0;
     if (client->handler && client->handler->on_header)
     {
-        return client->handler->on_header(client, client->handler->on_header_data, http_server_string_str(&new_header->field), http_server_string_str(&new_header->value));
+        r = client->handler->on_header(client, client->handler->on_header_data, http_server_string_str(&new_header->field), http_server_string_str(&new_header->value));
     }
-    return 0;
+    // Look for "Expect: 100-continue"
+    struct http_server_header * header;
+    TAILQ_FOREACH(header, &client->headers, headers)
+    {
+        fprintf(stderr, "header key[%s] value[%s]\n", http_server_string_str(&header->field), http_server_string_str(&header->value));
+        if (strcasecmp(http_server_string_str(&header->field), "Expect") == 0
+            && strcasecmp(http_server_string_str(&header->value), "100-continue") == 0)
+        {
+            // TODO: Execute user specified callback that handles 100-continue
+            char * status_line = "HTTP/1.1 100 Continue\r\n\r\n";
+            fprintf(stderr, "send 100 continue\n");
+            if (http_server_client_write(client, status_line, strlen(status_line)) != HTTP_SERVER_OK)
+            {
+                fprintf(stderr, "unable to write data to client %d\n", client->sock);
+                return 1;
+            }
+            if (http_server_client_flush(client) != HTTP_SERVER_OK)
+            {
+                fprintf(stderr, "unable to flush data to client %d\n", client->sock);
+                return 1;
+            }
+            break;
+        }
+    }
+    return r;
 }
 
 http_server_client * http_server_new_client(http_server * server, http_server_socket_t sock, http_server_handler * handler)

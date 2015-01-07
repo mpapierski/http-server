@@ -1,6 +1,3 @@
-[submodule "tests/tap"]
-	path = tests/tap
-	url = https://github.com/zorgnax/libtap
 [submodule "deps/http-parser"]
 	path = deps/http-parser
 	url = https://github.com/joyent/http-parser.git

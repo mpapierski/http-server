@@ -127,6 +127,12 @@ int on_message_complete(http_server_client * client, void * data)
     return 0;
 }
 
+int on_debug(int kind, char * ptr, int length, void * userdata)
+{
+    fprintf(stderr, "Debug message: %.*s\n", length, ptr);
+    return HTTP_SERVER_OK;
+}
+
 int main(int argc, char * argv[])
 {
     int exit_code;
@@ -136,6 +142,12 @@ int main(int argc, char * argv[])
     if ((result = http_server_init(&srv)) != HTTP_SERVER_OK)
     {
         fprintf(stderr, "Unable to init http server instance: %s\n", http_server_errstr(result));
+        return 1;
+    }
+    // Set debug function
+    if ((result = http_server_setopt(&srv, HTTP_SERVER_OPT_DEBUG_FUNCTION, &on_debug)) != HTTP_SERVER_OK)
+    {
+        fprintf(stderr, "Unable to set debug function: %s\n", http_server_errstr(result));
         return 1;
     }
     // Init handler function

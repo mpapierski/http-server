@@ -51,6 +51,8 @@ typedef enum {
     HTTP_SERVER_CINIT(CLOSE_SOCKET_DATA, POINTER, 6),
     HTTP_SERVER_CINIT(HANDLER, POINTER, 7),
     HTTP_SERVER_CINIT(HANDLER_DATA, POINTER, 8),
+    HTTP_SERVER_CINIT(DEBUG_FUNCTION, FUNCTION, 9),
+    HTTP_SERVER_CINIT(DEBUG_DATA, POINTER, 10)
 } http_server_option;
 
 /**
@@ -115,6 +117,11 @@ typedef int (*http_server_closesocket_callback)(http_server_socket_t sock, void 
  * @param socketp Some custom data assigned to socket (could be NULL)
  */
 typedef int (*http_server_socket_callback)(void * clientp, http_server_socket_t sock, int flags, void * socketp);
+
+/**
+ * Called with some debug message
+ */
+typedef int (*http_server_debug_callback)(int kind, char * ptr, int length, void * clientp);
 
 // Request handler
 
@@ -251,6 +258,14 @@ typedef struct http_server
      */
     void * socket_data;
     /**
+     * Called when http-server internals logs some message
+     */
+    http_server_debug_callback debug_func;
+    /**
+     * User passed pointer to the `debug_func` callback
+     */
+    void * debug_data;
+    /**
      * All connected clients
      */
     SLIST_HEAD(slisthead, http_server_client) clients;
@@ -366,6 +381,12 @@ int http_server_pop_client(http_server * srv, http_server_socket_t sock);
  * @param flags Flags (mix of flags: HTTP_SERVER_POLL_IN|HTTP_SERVER_POLL_OUT)
  */
 int http_server_socket_action(http_server * srv, http_server_socket_t socket, int flags);
+
+/**
+ * Send debug message through user callback
+ * @private
+ */
+int http_server__debug(http_server * srv, int kind, char * format, ...);
 
 /**
  * Create new HTTP client instance

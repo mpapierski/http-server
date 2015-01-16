@@ -85,11 +85,12 @@ static void Http_server_kqueue_event_loop_free(http_server * srv)
 
 static int _default_opensocket_function(void * clientp)
 {
+    Http_server_event_handler * ev = clientp;
     int s;
     int optval;
     // create default ipv4 socket for listener
     s = socket(AF_INET, SOCK_STREAM, 0);
-    fprintf(stderr, "open socket: %d\n", s);
+    http_server__debug(ev->srv, 1, "open socket: %d", s);
     if (s == -1)
     {
         return HTTP_SERVER_INVALID_SOCKET;
@@ -130,8 +131,8 @@ static int _default_opensocket_function(void * clientp)
 
 static int _default_closesocket_function(http_server_socket_t sock, void * clientp)
 {
-    fprintf(stderr, "close(%d)\n", sock);
     Http_server_event_handler * ev = clientp;
+    http_server__debug(ev->srv, 1, "close(%d)", sock);
     // Pop event from the events vector by rewriting all events
     // from the list to the new list excluding the event related
     // with fd descriptor.
@@ -177,7 +178,7 @@ static int _default_socket_function(void * clientp, http_server_socket_t sock, i
     {
         if (ev->evsize + 1 >= ev->chlist_size)
         {
-            fprintf(stderr, "RESIZE!!!\n");
+            http_server__debug(srv, 1, "RESIZE!!!");
             int current_evsize = ev->evsize;
             struct kevent * new_events = realloc(ev->chlist, sizeof(struct kevent) * (ev->chlist_size * 2));
             if (!new_events)
@@ -188,7 +189,7 @@ static int _default_socket_function(void * clientp, http_server_socket_t sock, i
             ev->evsize += 1;
             ev->chlist = new_events;
             kev = &ev->chlist[current_evsize];
-            fprintf(stderr, "evsize=%d chlist_size=%d\n", ev->evsize, ev->chlist_size);
+            http_server__debug(srv, 1, "evsize=%d chlist_size=%d", ev->evsize, ev->chlist_size);
         }
         else
         {
@@ -215,21 +216,21 @@ static int _default_socket_function(void * clientp, http_server_socket_t sock, i
 
 static int Http_server_kqueue_event_loop_run(http_server * srv)
 {
-    fprintf(stderr, "srv=%p\n", srv);
+    http_server__debug(srv, 1, "srv=%p", srv);
     Http_server_event_handler * ev = srv->closesocket_data;
     for (;;)
     {
         if (ev->evsize == 0)
         {
-            fprintf(stderr, "no more events...\n");
+            http_server__debug(srv, 1, "no more events...");
             break;
         }
         struct kevent * evlist = calloc(ev->evsize, sizeof(struct kevent));
         assert(evlist);
         assert(ev->chlist);
-        fprintf(stderr, "kq=%d chlist=%p evsize=%d\n", ev->kq, ev->chlist, ev->evsize);
+        http_server__debug(srv, 1, "kq=%d chlist=%p evsize=%d", ev->kq, ev->chlist, ev->evsize);
         int nev = kevent(ev->kq, ev->chlist, ev->evsize, evlist, ev->evsize, NULL);
-        fprintf(stderr, "nev=%d\n", nev);
+        http_server__debug(srv, 1, "nev=%d", nev);
         if (nev == -1)
         {
             perror("kevent");
@@ -239,14 +240,14 @@ static int Http_server_kqueue_event_loop_run(http_server * srv)
         {
             if (evlist[i].flags & EV_ERROR)
             {
-                fprintf(stderr, "EV_ERROR: %s\n", strerror(evlist[i].data));
+                http_server__debug(srv, 1, "EV_ERROR: %s", strerror(evlist[i].data));
                 abort();
             }
             if (evlist[i].filter == EVFILT_READ)
             {
                 if (http_server_socket_action(srv, evlist[i].ident, HTTP_SERVER_POLL_IN) != HTTP_SERVER_OK)
                 {
-                    fprintf(stderr, "unable to read incoming data\n");
+                    http_server__debug(srv, 1, "unable to read incoming data");
                     continue;
                 }
             }
@@ -254,7 +255,7 @@ static int Http_server_kqueue_event_loop_run(http_server * srv)
             {
                 if (http_server_socket_action(srv, evlist[i].ident, HTTP_SERVER_POLL_OUT) != HTTP_SERVER_OK)
                 {
-                    fprintf(stderr, "unable to write outgoing data\n");
+                    http_server__debug(srv, 1, "unable to write outgoing data");
                     continue;
                 }
             }

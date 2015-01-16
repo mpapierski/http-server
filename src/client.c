@@ -18,12 +18,10 @@ static void http_server__client_free_headers(http_server_client * client)
 static int my_url_callback(http_parser * parser, const char * at, size_t length)
 {
     http_server_client * client = parser->data;
-    fprintf(stderr, "url chunk: %.*s\n", (int)length, at);
     int rv = 0;
     if (http_server_string_append(&client->url, at, length) != HTTP_SERVER_OK)
     {
         // Failed to add more memory to the URL. Failure, stop.
-        fprintf(stderr, "failed to add more moemory to url\n");
         return 1;
     }
     return rv;
@@ -32,7 +30,6 @@ static int my_url_callback(http_parser * parser, const char * at, size_t length)
 static int my_message_complete_callback(http_parser * parser)
 {
     http_server_client * client = parser->data;
-    fprintf(stderr, "message complete\n");
     int rv = 0;
     if (client->handler && client->handler->on_message_complete)
     {
@@ -47,7 +44,6 @@ static int my_message_complete_callback(http_parser * parser)
 static int my_on_body(http_parser * parser, const char * at, size_t length)
 {
     http_server_client * client = parser->data;
-    fprintf(stderr, "body: %.*s\n", (int)length, at);
     int rv;
     if (client->handler && client->handler->on_body)
     {
@@ -78,7 +74,7 @@ static int my_on_header_field(http_parser * parser, const char * at, size_t leng
         // Move temporary fields into new header structure
         http_server_string_move(&client->header_field_, &new_header->field);
         http_server_string_move(&client->header_value_, &new_header->value);
-        //fprintf(stderr, "new header key[%s] value[%s]\n", http_server_string_str(&new_header->field), http_server_string_str(&new_header->value));
+        //http_server__debug(srv, 1, "new header key[%s] value[%s]\n", http_server_string_str(&new_header->field), http_server_string_str(&new_header->value));
         TAILQ_INSERT_TAIL(&client->headers, new_header, headers);
         if (client->handler && client->handler->on_header)
         {
@@ -150,21 +146,17 @@ int my_on_headers_complete(http_parser * parser)
     struct http_server_header * header;
     TAILQ_FOREACH(header, &client->headers, headers)
     {
-        fprintf(stderr, "header key[%s] value[%s]\n", http_server_string_str(&header->field), http_server_string_str(&header->value));
         if (strcasecmp(http_server_string_str(&header->field), "Expect") == 0
             && strcasecmp(http_server_string_str(&header->value), "100-continue") == 0)
         {
             // TODO: Execute user specified callback that handles 100-continue
             char * status_line = "HTTP/1.1 100 Continue\r\n\r\n";
-            fprintf(stderr, "send 100 continue\n");
             if (http_server_client_write(client, status_line, strlen(status_line)) != HTTP_SERVER_OK)
             {
-                fprintf(stderr, "unable to write data to client %d\n", client->sock);
                 return 1;
             }
             if (http_server_client_flush(client) != HTTP_SERVER_OK)
             {
-                fprintf(stderr, "unable to flush data to client %d\n", client->sock);
                 return 1;
             }
             break;
@@ -232,12 +224,11 @@ int http_server_perform_client(http_server_client * client, const char * at, siz
 {
     assert(client);
     int nparsed = http_parser_execute(&client->parser_, &client->parser_settings_, at, size);
-    fprintf(stderr, "parse %d/%d\n", (int)size, nparsed);
     if (nparsed != size)
     {
         const char * err = http_errno_description(client->parser_.http_errno);
         // Error
-        fprintf(stderr, "unable to execute parser %d/%d (%s)\n", (int)nparsed, (int)size, err);
+        http_server__debug(client->server_, 1, "unable to execute parser %d/%d (%s)\n", (int)nparsed, (int)size, err);
         return HTTP_SERVER_PARSER_ERROR;
     }
     return HTTP_SERVER_OK;
@@ -338,7 +329,7 @@ int http_server_client_pause(http_server_client * client, int pause)
         return HTTP_SERVER_INVALID_PARAM;
     }
     int previous_state = client->is_paused_;
-    fprintf(stderr, "change paused on %d from %d->%d\n", client->sock, previous_state, pause);
+    http_server__debug(client->server_, 1, "change paused on %d from %d->%d\n", client->sock, previous_state, pause);
     client->is_paused_ = pause;
     // If paused state is enabled after it was disabled then we try
     // to read data again.

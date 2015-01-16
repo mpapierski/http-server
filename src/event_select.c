@@ -30,6 +30,7 @@ typedef struct
 {
     // flags for clients
     int flags[64];
+    http_server * srv;
 } Http_server_event_handler;
 
 static int _default_opensocket_function(void * clientp);
@@ -40,13 +41,14 @@ static int Http_server_select_event_loop_init(http_server * srv)
 {
     // Create new default event handler
     Http_server_event_handler * ev = calloc(1, sizeof(Http_server_event_handler));
+    ev->srv = srv;
     srv->socket_data = ev;
     srv->event_loop_data_ = ev;
 
     srv->sock_listen = HTTP_SERVER_INVALID_SOCKET;
     srv->sock_listen_data = ev;
     srv->opensocket_func = &_default_opensocket_function;
-    srv->opensocket_data = srv;
+    srv->opensocket_data = ev;
     srv->closesocket_func = &_default_closesocket_function;
     srv->closesocket_data = ev;
     srv->socket_func = &_default_socket_function;
@@ -63,11 +65,13 @@ static void Http_server_select_event_loop_free(http_server * srv)
 
 static int _default_opensocket_function(void * clientp)
 {
+    Http_server_event_handler * ev = clientp;
+    http_server * srv = ev->srv;
     int s;
     int optval;
     // create default ipv4 socket for listener
     s = socket(AF_INET, SOCK_STREAM, 0);
-    fprintf(stderr, "open socket: %d\n", s);
+    http_server__debug(srv, 1, "open socket: %d\n", s);
     if (s == -1)
     {
         return HTTP_SERVER_INVALID_SOCKET;
@@ -105,8 +109,9 @@ static int _default_opensocket_function(void * clientp)
 
 static int _default_closesocket_function(http_server_socket_t sock, void * clientp)
 {
-    fprintf(stderr, "close(%d)\n", sock);
     Http_server_event_handler * ev = clientp;
+    http_server * srv = ev->srv;
+    http_server__debug(srv, 1, "close(%d)\n", sock);
     ev->flags[sock] = 0;
     if (close(sock) == -1)
     {
@@ -149,7 +154,7 @@ static int Http_server_select_event_loop_run(http_server * srv)
             assert(it->sock > -1);
             if (ev->flags[it->sock] & HTTP_SERVER_POLL_IN)
             {
-                fprintf(stderr, "rd=%d\n", it->sock);
+                http_server__debug(srv, 1, "rd=%d\n", it->sock);
                 FD_SET(it->sock, &rd);
                 if (it->sock > nsock)
                 {
@@ -158,7 +163,7 @@ static int Http_server_select_event_loop_run(http_server * srv)
             }
             if (ev->flags[it->sock] & HTTP_SERVER_POLL_OUT)
             {
-                fprintf(stderr, "wr=%d\n", it->sock);
+                http_server__debug(srv, 1, "wr=%d\n", it->sock);
                 FD_SET(it->sock, &wr);
                 if (it->sock > nsock)
                 {
@@ -168,7 +173,7 @@ static int Http_server_select_event_loop_run(http_server * srv)
         }
         if (ev->flags[srv->sock_listen] & HTTP_SERVER_POLL_IN)
         {
-            fprintf(stderr, "rd sock listen %d\n", srv->sock_listen);
+            http_server__debug(srv, 1, "rd sock listen %d\n", srv->sock_listen);
             FD_SET(srv->sock_listen, &rd);
             if (srv->sock_listen > nsock)
             {
@@ -178,7 +183,7 @@ static int Http_server_select_event_loop_run(http_server * srv)
 
         if (nsock == 0)
         {
-            fprintf(stderr, "no more events..\n");
+            http_server__debug(srv, 1, "no more events..\n");
             break;
         }
                 
@@ -187,9 +192,9 @@ static int Http_server_select_event_loop_run(http_server * srv)
         struct timeval tv;
         tv.tv_sec = 1;
         tv.tv_usec = 0;
-        fprintf(stderr, "select(%d, {%d}, ...)\n", nsock + 1, srv->sock_listen);
+        http_server__debug(srv, 1, "select(%d, {%d}, ...)\n", nsock + 1, srv->sock_listen);
         r = select(nsock + 1, &rd, &wr, 0, &tv);
-        fprintf(stderr, "r=%d\n", r);
+        http_server__debug(srv, 1, "r=%d\n", r);
         if (r == -1)
         {
             perror("select");
@@ -197,7 +202,7 @@ static int Http_server_select_event_loop_run(http_server * srv)
         }
         else
         {
-            fprintf(stderr, "select result=%d\n", r);
+            http_server__debug(srv, 1, "select result=%d\n", r);
         }
         if (r == 0)
         {
@@ -215,20 +220,20 @@ static int Http_server_select_event_loop_run(http_server * srv)
             {
                 assert(ev->flags[it->sock] & HTTP_SERVER_POLL_IN);
                 ev->flags[it->sock] ^= HTTP_SERVER_POLL_IN;
-                fprintf(stderr, "client data is available fd=%d\n", it->sock);
+                http_server__debug(srv, 1, "client data is available fd=%d\n", it->sock);
                 int action_result = http_server_socket_action(srv, it->sock, HTTP_SERVER_POLL_IN);
                 if (action_result != HTTP_SERVER_OK)
                 {
                     if (action_result != HTTP_SERVER_CLIENT_EOF)
                     {
-                        fprintf(stderr, "failed to do socket action on fd=%d\n", it->sock);
+                        http_server__debug(srv, 1, "failed to do socket action on fd=%d\n", it->sock);
                     }
                     continue;
                 }
             }
             if (FD_ISSET(it->sock, &wr))
             {
-                fprintf(stderr, "send outgoing data=%d\n", it->sock);
+                http_server__debug(srv, 1, "send outgoing data=%d\n", it->sock);
                 // Send outgoing data
                 assert(ev->flags[it->sock] & HTTP_SERVER_POLL_OUT);
                 ev->flags[it->sock] ^= HTTP_SERVER_POLL_OUT;
@@ -236,13 +241,13 @@ static int Http_server_select_event_loop_run(http_server * srv)
                 {
                     continue;
                 }
-                fprintf(stderr, "sent success!\n");
+                http_server__debug(srv, 1, "sent success!\n");
             }
         }
 
         if (FD_ISSET(srv->sock_listen, &rd))
         {
-            fprintf(stderr, "action on sock listen\n");
+            http_server__debug(srv, 1, "action on sock listen\n");
             // Check for new connection
             // This will create new client structure and it will be
             // saved in list.
@@ -250,7 +255,7 @@ static int Http_server_select_event_loop_run(http_server * srv)
             ev->flags[srv->sock_listen] ^= HTTP_SERVER_POLL_IN;
             if (http_server_socket_action(srv, srv->sock_listen, HTTP_SERVER_POLL_IN) != HTTP_SERVER_OK)
             {
-                fprintf(stderr, "unable to accept new client\n");
+                http_server__debug(srv, 1, "unable to accept new client\n");
                 continue;
             }
             continue;

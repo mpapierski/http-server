@@ -32,6 +32,8 @@ int http_server_init(http_server * srv)
     srv->closesocket_data = NULL;
     srv->socket_func = NULL;
     srv->socket_data = NULL;
+    srv->debug_func = NULL;
+    srv->debug_data = NULL;
     SLIST_INIT(&srv->clients);
     srv->handler_ = NULL;
     srv->response_ = NULL;
@@ -55,7 +57,6 @@ int http_server_init(http_server * srv)
         return HTTP_SERVER_INVALID_PARAM;
     }
     int result;
-    fprintf(stderr, "initialize event loop %s\n", event_loop);
     if ((result = Http_server_event_loop_init(srv, event_loop)) != HTTP_SERVER_OK)
     {
         return result;
@@ -75,34 +76,32 @@ int http_server_setopt(http_server * srv, http_server_option opt, ...)
 {
     va_list ap;
     va_start(ap, opt);
-    fprintf(stderr, "setopt: %d\n", opt);
     if (opt >= HTTP_SERVER_POINTER_POINT && opt < HTTP_SERVER_FUNCTION_POINT)
     {
         void * ptr = va_arg(ap, void*);
         if (opt == HTTP_SERVER_OPT_OPEN_SOCKET_DATA)
         {
             srv->opensocket_data = ptr;
-            fprintf(stderr, "set opensocket data %p\n", ptr);
         }
         if (opt == HTTP_SERVER_OPT_CLOSE_SOCKET_DATA)
         {
             srv->closesocket_data = ptr;
-            fprintf(stderr, "set close socket func data %p\n", ptr);
         }
         if (opt == HTTP_SERVER_OPT_SOCKET_DATA)
         {
             srv->socket_data = ptr;
-            fprintf(stderr, "set socket func data %p\n", ptr);
         }
         if (opt == HTTP_SERVER_OPT_HANDLER)
         {
             srv->handler_ = ptr;
-            fprintf(stderr, "set handler %p\n", ptr);
         }
         if (opt == HTTP_SERVER_OPT_HANDLER_DATA)
         {
             srv->handler_->data = ptr;
-            fprintf(stderr, "set handler data %p\n", ptr);
+        }
+        if (opt == HTTP_SERVER_OPT_DEBUG_DATA)
+        {
+            srv->debug_data = ptr;
         }
         goto success;
     }
@@ -111,17 +110,18 @@ int http_server_setopt(http_server * srv, http_server_option opt, ...)
         if (opt == HTTP_SERVER_OPT_OPEN_SOCKET_FUNCTION)
         {
             srv->opensocket_func = va_arg(ap, http_server_opensocket_callback);
-            fprintf(stderr, "set opensocket func\n");
         }
         if (opt == HTTP_SERVER_OPT_CLOSE_SOCKET_FUNCTION)
         {
             srv->closesocket_func = va_arg(ap, http_server_closesocket_callback);
-            fprintf(stderr, "set closesocket func\n");
         }
         if (opt == HTTP_SERVER_OPT_SOCKET_FUNCTION)
         {
             srv->socket_func = va_arg(ap, http_server_socket_callback);
-            fprintf(stderr, "set socket func\n");
+        }
+        if (opt == HTTP_SERVER_OPT_DEBUG_FUNCTION)
+        {
+            srv->debug_func = va_arg(ap, http_server_debug_callback);
         }
         goto success;
     }
@@ -246,7 +246,7 @@ int http_server_socket_action(http_server * srv, http_server_socket_t socket, in
         struct sockaddr_in cli_addr;
         socklen_t clilen = sizeof(cli_addr);
         // accept
-        fprintf(stderr, "new conn\n");
+        http_server__debug(srv, 1, "new conn");
         int fd = accept(srv->sock_listen, (struct sockaddr *) &cli_addr, &clilen);
         if (fd == -1)
         {
@@ -266,7 +266,7 @@ int http_server_socket_action(http_server * srv, http_server_socket_t socket, in
             close(fd);
             return HTTP_SERVER_SOCKET_ERROR;
         }
-        fprintf(stderr, "new client: %d\n", fd);
+        http_server__debug(srv, 1, "new client: %d", fd);
         return HTTP_SERVER_OK;
     }
     int r = HTTP_SERVER_OK;
@@ -315,7 +315,7 @@ int http_server_socket_action(http_server * srv, http_server_socket_t socket, in
         }
         else if (bytes_received == 0)
         {
-            fprintf(stderr, "client eof %d\n", client->sock);
+            http_server__debug(srv, 1, "client eof %d", client->sock);
             if (http_server_perform_client(client, tmp, bytes_received) != HTTP_SERVER_OK)
             {
                 return HTTP_SERVER_SOCKET_ERROR;
@@ -336,7 +336,7 @@ int http_server_socket_action(http_server * srv, http_server_socket_t socket, in
         }
         else
         {
-            fprintf(stderr, "received %d bytes from %d\n", bytes_received, client->sock);
+            http_server__debug(srv, 1, "received %d bytes from %d", bytes_received, client->sock);
             if (http_server_perform_client(client, tmp, bytes_received) != HTTP_SERVER_OK)
             {
                 // TODO: close connection for now but this should be something like 400 BAD REQUEST.
@@ -350,10 +350,10 @@ int http_server_socket_action(http_server * srv, http_server_socket_t socket, in
                 }
                 return r;
             }
-            fprintf(stderr, "is_complete: %d\n", it->is_complete);
+            http_server__debug(srv, 1, "is_complete: %d", it->is_complete);
             if (!it->is_paused_ && !it->is_complete && http_server_poll_client(it, HTTP_SERVER_POLL_IN) != HTTP_SERVER_OK)
             {
-                fprintf(stderr, "unable to poll in - request incomplete\n");
+                http_server__debug(srv, 1, "unable to poll in - request incomplete");
                 return HTTP_SERVER_SOCKET_ERROR;
             }
         }
@@ -390,7 +390,7 @@ int http_server_socket_action(http_server * srv, http_server_socket_t socket, in
         {
             // Unable to send data?
             int e = errno;
-            fprintf(stderr, "unable to write: %s\n", strerror(e));
+            http_server__debug(srv, 1, "unable to write: %s", strerror(e));
             if (http_server_poll_client(it, HTTP_SERVER_POLL_REMOVE) != HTTP_SERVER_OK)
             {
                 return HTTP_SERVER_SOCKET_ERROR;
@@ -401,10 +401,10 @@ int http_server_socket_action(http_server * srv, http_server_socket_t socket, in
             }
             //perror("write");
             // int e = errno;
-            // fprintf(stderr, "Unable to write data to client %d: %d\n", e, bytes_transferred);
+            // fprintf(stderr, "Unable to write data to client %d: %d", e, bytes_transferred);
             return HTTP_SERVER_SOCKET_ERROR;
         }
-        fprintf(stderr, "Client %d: written %d bytes\n", client->sock, (int)bytes_transferred);
+        http_server__debug(srv, 1, "Client %d: written %d bytes", client->sock, (int)bytes_transferred);
         // Pop buffers from response
         iocnt = 0;
         buf = NULL;
@@ -428,11 +428,11 @@ int http_server_socket_action(http_server * srv, http_server_socket_t socket, in
         if (bytes_transferred > 0 && !TAILQ_EMPTY(&client->buffer))
         {
             // This is probably buggy
-            fprintf(stderr, "truncate first buffer\n");
+            http_server__debug(srv, 1, "truncate first buffer");
             buf = TAILQ_FIRST(&client->buffer);
             if (bytes_transferred > buf->size)
             {
-                fprintf(stderr, "there is too much to truncate: %d > %d\n", (int)bytes_transferred, buf->size);
+                http_server__debug(srv, 1, "there is too much to truncate: %d > %d", (int)bytes_transferred, buf->size);
                 return HTTP_SERVER_OK;
             }
             // Truncate first buffer
@@ -461,10 +461,26 @@ int http_server_socket_action(http_server * srv, http_server_socket_t socket, in
             // All response is sent. Poll again for new request
             if (http_server_poll_client(client, HTTP_SERVER_POLL_IN) != HTTP_SERVER_OK)
             {
-                fprintf(stderr, "unable to poll in for next request on client %d\n", client->sock);
+                http_server__debug(srv, 1, "unable to poll in for next request on client %d", client->sock);
                 return HTTP_SERVER_SOCKET_ERROR;
             }
         }
     }
     return r;
+}
+
+int http_server__debug(http_server * srv, int kind, char * format, ...)
+{
+    if (!srv->debug_func)
+    {
+        return HTTP_SERVER_OK;
+    }
+    va_list args;
+    va_start(args, format);
+    char * buffer = NULL;
+    size_t length = vasprintf(&buffer, format, args);
+    int result = srv->debug_func(kind, buffer, length, srv->debug_data);
+    free(buffer);
+    va_end(args);
+    return result;
 }

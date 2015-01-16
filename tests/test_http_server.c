@@ -40,12 +40,18 @@ static int _socket_function(void * clientp, http_server_socket_t sock, int flags
     return HTTP_SERVER_OK;
 }
 
+static int _debug_function(int kind, char * data, int length, void * userp)
+{
+    return HTTP_SERVER_OK;
+}
+
 void test_test_http_server__setopt(void)
 {
     int r;
     int opensocket_data = 42;
     int closesocket_data = 43;
     int socket_data = 44;
+    int debug_data = 45;
 
     r = http_server_setopt(&srv, HTTP_SERVER_OPT_OPEN_SOCKET_DATA, &opensocket_data);
     cl_assert(r == HTTP_SERVER_OK);
@@ -70,7 +76,21 @@ void test_test_http_server__setopt(void)
     r = http_server_setopt(&srv, HTTP_SERVER_OPT_SOCKET_FUNCTION, &_socket_function);
     cl_assert(r == HTTP_SERVER_OK);
     cl_assert(srv.socket_func == &_socket_function);
-    fprintf(stderr, "(test) ev: %p\n", srv.socket_data);
+
+    r = http_server_setopt(&srv, HTTP_SERVER_OPT_DEBUG_FUNCTION, &_debug_function);
+    cl_assert_equal_i(r, HTTP_SERVER_OK);
+    cl_assert(srv.debug_func == &_debug_function);
+
+    r = http_server_setopt(&srv, HTTP_SERVER_OPT_DEBUG_DATA, &debug_data);
+    cl_assert_equal_i(r, HTTP_SERVER_OK);
+    cl_assert(srv.debug_data == &debug_data);
+}
+
+void test_test_http_server__setopt_failure(void)
+{
+    int r;
+    r = http_server_setopt(&srv, -1223424, 0);
+    cl_assert_equal_i(r, HTTP_SERVER_INVALID_PARAM);
 }
 
 void test_test_http_server__start(void)

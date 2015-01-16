@@ -15,6 +15,7 @@ extern void test_client__cleanup(void);
 extern void test_test_errors__invalid_error(void);
 extern void test_test_errors__check_messages(void);
 extern void test_test_http_server__setopt(void);
+extern void test_test_http_server__setopt_failure(void);
 extern void test_test_http_server__start(void);
 extern void test_test_http_server__manage_clients(void);
 extern void test_test_http_server__initialize(void);
@@ -39,6 +40,7 @@ static const struct clar_func _clar_cb_test_errors[] = {
 };
 static const struct clar_func _clar_cb_test_http_server[] = {
     { "setopt", &test_test_http_server__setopt },
+    { "setopt_failure", &test_test_http_server__setopt_failure },
     { "start", &test_test_http_server__start },
     { "manage_clients", &test_test_http_server__manage_clients }
 };
@@ -65,7 +67,7 @@ static struct clar_suite _clar_suites[] = {
         "test::http::server",
         { "initialize", &test_test_http_server__initialize },
         { "cleanup", &test_test_http_server__cleanup },
-        _clar_cb_test_http_server, 3, 1
+        _clar_cb_test_http_server, 4, 1
     },
     {
         "test::response",
@@ -75,4 +77,4 @@ static struct clar_suite _clar_suites[] = {
     }
 };
 static const size_t _clar_suite_count = 5;
-static const size_t _clar_callback_count = 13;
+static const size_t _clar_callback_count = 14;

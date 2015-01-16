@@ -74,6 +74,7 @@ void http_server_free(http_server * srv)
 
 int http_server_setopt(http_server * srv, http_server_option opt, ...)
 {
+    int result = HTTP_SERVER_OK;
     va_list ap;
     va_start(ap, opt);
     if (opt >= HTTP_SERVER_POINTER_POINT && opt < HTTP_SERVER_FUNCTION_POINT)
@@ -83,51 +84,60 @@ int http_server_setopt(http_server * srv, http_server_option opt, ...)
         {
             srv->opensocket_data = ptr;
         }
-        if (opt == HTTP_SERVER_OPT_CLOSE_SOCKET_DATA)
+        else if (opt == HTTP_SERVER_OPT_CLOSE_SOCKET_DATA)
         {
             srv->closesocket_data = ptr;
         }
-        if (opt == HTTP_SERVER_OPT_SOCKET_DATA)
+        else if (opt == HTTP_SERVER_OPT_SOCKET_DATA)
         {
             srv->socket_data = ptr;
         }
-        if (opt == HTTP_SERVER_OPT_HANDLER)
+        else if (opt == HTTP_SERVER_OPT_HANDLER)
         {
             srv->handler_ = ptr;
         }
-        if (opt == HTTP_SERVER_OPT_HANDLER_DATA)
+        else if (opt == HTTP_SERVER_OPT_HANDLER_DATA)
         {
             srv->handler_->data = ptr;
         }
-        if (opt == HTTP_SERVER_OPT_DEBUG_DATA)
+        else if (opt == HTTP_SERVER_OPT_DEBUG_DATA)
         {
             srv->debug_data = ptr;
         }
-        goto success;
+        else
+        {
+            result = HTTP_SERVER_INVALID_PARAM;
+        }
     }
-    if (opt >= HTTP_SERVER_FUNCTION_POINT)
+    else if (opt >= HTTP_SERVER_FUNCTION_POINT)
     {
         if (opt == HTTP_SERVER_OPT_OPEN_SOCKET_FUNCTION)
         {
             srv->opensocket_func = va_arg(ap, http_server_opensocket_callback);
         }
-        if (opt == HTTP_SERVER_OPT_CLOSE_SOCKET_FUNCTION)
+        else if (opt == HTTP_SERVER_OPT_CLOSE_SOCKET_FUNCTION)
         {
             srv->closesocket_func = va_arg(ap, http_server_closesocket_callback);
         }
-        if (opt == HTTP_SERVER_OPT_SOCKET_FUNCTION)
+        else if (opt == HTTP_SERVER_OPT_SOCKET_FUNCTION)
         {
             srv->socket_func = va_arg(ap, http_server_socket_callback);
         }
-        if (opt == HTTP_SERVER_OPT_DEBUG_FUNCTION)
+        else if (opt == HTTP_SERVER_OPT_DEBUG_FUNCTION)
         {
             srv->debug_func = va_arg(ap, http_server_debug_callback);
         }
-        goto success;
+        else
+        {
+            result = HTTP_SERVER_INVALID_PARAM;
+        }
     }
-success:
+    else
+    {
+        result = HTTP_SERVER_INVALID_PARAM;
+    }
     va_end(ap);
-    return HTTP_SERVER_OK;
+    return result;
 }
 
 int http_server_start(http_server * srv)

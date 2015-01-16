@@ -3,6 +3,7 @@ project (http_server C CXX)
 
 option (HTTP_SERVER_TESTS "Build http-server tests" OFF)
 option (HTTP_SERVER_EXAMPLES "Build http-server examples" OFF)
+option (HTTP_SERVER_COV "Build http-server with coverage" OFF)
 
 SET (CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 

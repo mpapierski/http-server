@@ -1,6 +1,8 @@
-include (CodeCoverage)
-set (CMAKE_CXX_FLAGS "-fprofile-arcs -ftest-coverage")
-set (CMAKE_C_FLAGS "-fprofile-arcs -ftest-coverage")
+if (HTTP_SERVER_COV)
+    include (CodeCoverage)
+    set (CMAKE_CXX_FLAGS "-fprofile-arcs -ftest-coverage")
+    set (CMAKE_C_FLAGS "-fprofile-arcs -ftest-coverage")
+endif ()
 
 # Test server for blackbox testing
 find_package (PythonInterp)
@@ -47,8 +49,10 @@ add_executable (test_suite
 target_link_libraries (test_suite
     http_server)
 
-# Coverage stuff
-get_property (test_suite_exe TARGET test_suite PROPERTY LOCATION)
-SETUP_TARGET_FOR_COVERAGE (coverage
-    ${test_suite_exe}
-    coverage)
+if (HTTP_SERVER_COV)
+    # Coverage stuff
+    get_property (test_suite_exe TARGET test_suite PROPERTY LOCATION)
+    SETUP_TARGET_FOR_COVERAGE (coverage
+        ${test_suite_exe}
+        coverage)
+endif ()

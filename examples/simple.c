@@ -10,7 +10,7 @@ int on_message_complete(http_server_client * client, void * data)
     int r = http_server_client_getinfo(client, HTTP_SERVER_CLIENTINFO_URL, &url);
     assert(r == HTTP_SERVER_OK);
     fprintf(stderr, "Message complete %s\n", url);
-    http_server_response * res = http_server_response_new();
+    http_server_response * res = http_server_response_new(client);
     assert(res);
     r = http_server_response_begin(client, res);
     assert(r == HTTP_SERVER_OK);

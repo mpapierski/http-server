@@ -2,15 +2,24 @@
 #include "http-server/http-server.h"
 
 http_server_string str;
+http_server_string hello_world;
 
 void test_strings__initialize(void)
 {
 	http_server_string_init(&str);
+	http_server_string_init(&hello_world);
+	int r = http_server_string_append(&hello_world, "Hello world!", 12);
+	cl_assert_equal_i(r, HTTP_SERVER_OK);
+	cl_assert_equal_i(hello_world.len, 12);
+	cl_assert_equal_i(hello_world.size, 13);
+	const char * s = http_server_string_str(&hello_world);
+	cl_assert_equal_s(s, "Hello world!");
 }
 
 void test_strings__cleanup(void)
 {
 	http_server_string_free(&str);
+	http_server_string_free(&hello_world);
 }
 
 void test_strings__append(void)
@@ -62,4 +71,27 @@ void test_strings__clear(void)
 	r = http_server_string_append(&str, " world", 6);
 	cl_assert_equal_i(r, HTTP_SERVER_OK);
 	cl_assert_equal_s(http_server_string_str(&str), " world");
+}
+
+void test_strings__length_with_null_pointer(void)
+{
+	cl_assert_equal_i(http_server_string_length(NULL), 0);
+}
+
+void test_strings__length(void)
+{
+	int r = http_server_string_append(&str, "Hello", 5);
+	cl_assert_equal_i(r, HTTP_SERVER_OK);
+	cl_assert_equal_i(http_server_string_length(&str), 5);
+	r = http_server_string_append(&str, " world", 6);
+	cl_assert_equal_i(http_server_string_length(&str), 11);
+	cl_assert_equal_i(r, HTTP_SERVER_OK);
+
+}
+
+void test_strings__strcpy(void)
+{
+	char buf[1024];
+	http_server_string_strcpy(&hello_world, buf, sizeof(buf));
+	cl_assert_equal_s(buf, "Hello world!");
 }

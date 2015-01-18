@@ -33,7 +33,7 @@ void test_test_response__cleanup(void)
 
 void http_response_write_head_test(int code, const char * message)
 {   
-    http_server_response * res = http_server_response_new();
+    http_server_response * res = http_server_response_new(client);
     http_server_response_begin(client, res);
     http_server_response_write_head(res, code);
     http_server_response_write(res, NULL, 0); // empty response
@@ -152,7 +152,7 @@ void test_test_response__without_chunked_response(void)
 //
     //test_http_response_enum();
 
-    http_server_response * res = http_server_response_new();
+    http_server_response * res = http_server_response_new(client);
     cl_assert_equal_i(http_server_response_begin(client, res), HTTP_SERVER_OK);
     // by default http response is chunked
     cl_assert_equal_i(res->is_chunked, 1);
@@ -226,7 +226,7 @@ void test_test_response__with_content_length(void)
     //#undef XX
 //
     //test_http_response_enum();
-    http_server_response * res = http_server_response_new();
+    http_server_response * res = http_server_response_new(client);
     cl_assert_equal_i(http_server_response_begin(client, res), HTTP_SERVER_OK);
     // by default http response is chunked
     cl_assert_equal_i(res->is_chunked, 1);

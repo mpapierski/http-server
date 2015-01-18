@@ -251,7 +251,7 @@ private:
     int handle_message(http_server_client * client, void * data)
     {
         // Write response
-        http_server_response * res = http_server_response_new();
+        http_server_response * res = http_server_response_new(client);
         
 
         int result = http_server_response_begin(client, res);

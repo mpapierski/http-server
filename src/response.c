@@ -21,7 +21,7 @@ static int http_server_header_cmp(struct http_server_header * lhs, struct http_s
     return tolower(*a)-tolower(*b);
 }
 
-http_server_response * http_server_response_new()
+http_server_response * http_server_response_new(struct http_server_client * client)
 {
     http_server_response * res = malloc(sizeof(http_server_response)); 
     if (!res)
@@ -35,10 +35,46 @@ http_server_response * http_server_response_new()
     int r = http_server_response_set_header(res, "Transfer-Encoding", 17, "chunked", 7);
     if (r != HTTP_SERVER_OK)
     {
-        return 0;
+        return NULL;
     }
     res->client = NULL;
     res->is_done = 0;
+    res->encoding = HTTP_SERVER_ENCODING_NONE;
+    // Prepare header for case insensitive comparision
+    struct http_server_header hdr_accept_encoding;
+    http_server_string_init(&hdr_accept_encoding.field);
+    if ((r = http_server_string_append(&hdr_accept_encoding.field, "Accept-Encoding", 15)) != HTTP_SERVER_OK)
+    {
+        return NULL;
+    }
+    // Check for Accept-Encoding header
+    struct http_server_header * hdr;
+    TAILQ_FOREACH(hdr, &client->headers, headers)
+    {
+        if (http_server_header_cmp(&hdr_accept_encoding, hdr) == 0)
+        {
+            char * word, * brkt;
+            const char * sep = ", ";
+            char copy[1024];
+            http_server_string_strcpy(&hdr->value, copy, sizeof(copy));
+            for (word = strtok_r(copy, sep, &brkt);
+                word;
+                word = strtok_r(NULL, sep, &brkt))
+            {
+                fprintf(stderr, "word:[%s]\n", word);
+                if (strcmp(word, "gzip") == 0)
+                {
+                    res->encoding = HTTP_SERVER_ENCODING_GZIP;
+                    break;
+                }
+                else if (strcmp(word, "deflate") == 0)
+                {
+                    res->encoding = HTTP_SERVER_ENCODING_DEFLATE;
+                    break;
+                }
+            }
+        }
+    }
     return res;
 }
 

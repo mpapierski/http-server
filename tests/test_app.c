@@ -45,7 +45,7 @@ int on_message_complete(http_server_client * client, void * data)
 {
     http_server_request * req = client->data;
     fprintf(stderr, "Message complete\n");
-    http_server_response * res = http_server_response_new();
+    http_server_response * res = http_server_response_new(client);
     ASSERT(res);
     char * url;
     int r = http_server_client_getinfo(client, HTTP_SERVER_CLIENTINFO_URL, &url);

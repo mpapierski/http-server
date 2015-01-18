@@ -96,6 +96,22 @@ void http_server_string_clear(http_server_string * str);
 void http_server_string_move(http_server_string * str1, http_server_string * str2);
 
 /**
+ * Copy string to a buffer
+ */
+void http_server_string_strcpy(http_server_string * str, char * buf, int size);
+
+/**
+ * Returns length of the string pointed at `str`
+ */
+int http_server_string_length(http_server_string * str);
+
+/**
+ * Assign a string buffer based on other string.
+ */
+int http_server_string_assign(http_server_string * src, http_server_string * dst);
+
+
+/**
  * Callback that will be called whenever http-server requests
  * new socket. At this point it is up to user to set socket's
  * purpse. It could be UDP or TCP (or some abstract type)
@@ -176,6 +192,16 @@ struct http_server_header * http_server_header_new();
  */
 void http_server_header_free(struct http_server_header * header);
 
+typedef enum
+{
+    // No encoding. Data is not compressed
+    HTTP_SERVER_ENCODING_NONE,
+    // Data is compressed with deflate algorithm
+    HTTP_SERVER_ENCODING_DEFLATE,
+    // Data is compressed with gzip algorithm
+    HTTP_SERVER_ENCODING_GZIP 
+} http_server_response_encoding;
+
 /**
  * HTTP rresponse object
  */
@@ -188,6 +214,7 @@ typedef struct http_server_response
     TAILQ_HEAD(http_server_headers, http_server_header) headers;
     int is_chunked;
     int is_done; // is response done?
+    http_server_response_encoding encoding;
 } http_server_response;
 
 struct http_server;
@@ -497,9 +524,14 @@ typedef enum
 int http_server_handler_init(http_server_handler * handler);
 
 /**
- * Creates new response object
+ * Creates new response object. Requires acccess to `http_server_client`
+ * instance. This is required because of possible request headers that
+ * should be check. One example of this requirement is `Accept-Encoding`
+ * header. After reading this header it is clear if the response should
+ * be wrapped in a known algorithm.
+ * @param client Client instance
  */
-http_server_response * http_server_response_new();
+http_server_response * http_server_response_new(http_server_client * client);
 
 /**
  * Free response and all associated

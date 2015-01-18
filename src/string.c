@@ -77,3 +77,38 @@ void http_server_string_move(http_server_string * str1, http_server_string * str
     str2->size = str1->size;
     str1->size = 0;
 }
+
+void http_server_string_strcpy(http_server_string * str, char * buf, int size)
+{
+    if (!str
+        || !buf
+        || size == 0)
+    {
+        return;
+    }
+    strncpy(buf, str->buf, size);
+}
+
+int http_server_string_length(http_server_string * str)
+{
+    if (!str)
+    {
+        return 0;
+    }
+    return str->len;    
+}
+
+int http_server_string_assign(http_server_string * src, http_server_string * dst)
+{
+    if (!src
+        || !dst)
+    {
+        return HTTP_SERVER_INVALID_PARAM;
+    }
+    // Dest string should be empty. All data will be overwritten.
+    http_server_string_clear(dst);
+    // Write `s
+    const char * src_str = http_server_string_str(src);
+    int src_len = http_server_string_length(src);
+    return http_server_string_append(src, src_str, src_len);
+}

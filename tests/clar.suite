@@ -5,6 +5,9 @@ extern void test_test_response__initialize(void);
 extern void test_test_response__cleanup(void);
 extern void test_strings__append(void);
 extern void test_strings__clear(void);
+extern void test_strings__length_with_null_pointer(void);
+extern void test_strings__length(void);
+extern void test_strings__strcpy(void);
 extern void test_strings__initialize(void);
 extern void test_strings__cleanup(void);
 extern void test_client__getinfo_empty(void);
@@ -27,7 +30,10 @@ static const struct clar_func _clar_cb_test_response[] = {
 };
 static const struct clar_func _clar_cb_strings[] = {
     { "append", &test_strings__append },
-    { "clear", &test_strings__clear }
+    { "clear", &test_strings__clear },
+    { "length_with_null_pointer", &test_strings__length_with_null_pointer },
+    { "length", &test_strings__length },
+    { "strcpy", &test_strings__strcpy }
 };
 static const struct clar_func _clar_cb_client[] = {
     { "getinfo_empty", &test_client__getinfo_empty },
@@ -55,7 +61,7 @@ static struct clar_suite _clar_suites[] = {
         "strings",
         { "initialize", &test_strings__initialize },
         { "cleanup", &test_strings__cleanup },
-        _clar_cb_strings, 2, 1
+        _clar_cb_strings, 5, 1
     },
     {
         "test::errors",
@@ -77,4 +83,4 @@ static struct clar_suite _clar_suites[] = {
     }
 };
 static const size_t _clar_suite_count = 5;
-static const size_t _clar_callback_count = 14;
+static const size_t _clar_callback_count = 17;

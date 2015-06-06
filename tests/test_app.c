@@ -115,6 +115,13 @@ int on_message_complete(http_server_client * client, void * data)
         r = http_server_response_printf(res, "success=%d\n", result);
         ASSERT(r == HTTP_SERVER_OK);
     }
+    else if (strcmp(url, "/status/custom/") == 0)
+    {
+        r = http_server_response_write_head2(res, 200, "Ok");
+        ASSERT(r == HTTP_SERVER_OK);
+        r = http_server_response_printf(res, "Hello world\n");
+        ASSERT(r == HTTP_SERVER_OK);
+    }
     else
     {
         r = http_server_response_write_head(res, 404);

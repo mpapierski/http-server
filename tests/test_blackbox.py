@@ -107,5 +107,12 @@ class BlackboxTestCase(unittest.TestCase):
         self.assertEqual(lines[3], 'total_headers=2')
         self.assertEqual(res.getheader('Transfer-Encoding'), 'chunked')
 
+    def test_get_custom_status(self):
+        res = self.request('GET', '/status/custom/')
+        self.assertEqual(res.status, 200)
+        self.assertEqual(res.reason, 'Ok')
+        self.assertEqual(res.read(), 'Hello world\n')
+        self.conn.close()
+
 if __name__ == '__main__':
     unittest.main()

@@ -523,9 +523,14 @@ int http_server_response_end(http_server_response * client);
 int http_server_response__flush(http_server_response * res);
 
 /**
- * Write response header
+ * Write response header with default description
  */
 int http_server_response_write_head(http_server_response * res, int status_code);
+
+/**
+ * Write response header with custom description
+ */
+int http_server_response_write_head2(http_server_response * res, int status_code, const char * description);
 
 /**
  * Sets header in response

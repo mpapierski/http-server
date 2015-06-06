@@ -79,23 +79,37 @@ int http_server_response_end(http_server_response * res)
     return http_server_response_write(res, NULL, 0);
 }
 
-int http_server_response_write_head(http_server_response * res, int status_code)
+static const char * http_server__get_description(int status_code)
 {
-    char head[1024];
-    int head_len = -1;
 #define XX(code, name, description) \
     case code: \
-        head_len = snprintf(head, sizeof(head), "HTTP/1.1 %d %s\r\n", code, description); \
-        break;
+        return description;
     switch (status_code)
     {
     HTTP_SERVER_ENUM_STATUS_CODES(XX)
     default:
+        return NULL;
+    }
+#undef XX
+}
+
+int http_server_response_write_head(http_server_response * res, int status_code)
+{
+    char head[1024];
+    const char * description = http_server__get_description(status_code);
+    if (!description)
+    {
         return HTTP_SERVER_INVALID_PARAM;
     }
-    int r = http_server_client_write(res->client, head, head_len);
-    return r;
-#undef XX
+    int head_len = snprintf(head, sizeof(head), "HTTP/1.1 %d %s\r\n", status_code, description);
+    return http_server_client_write(res->client, head, head_len);
+}
+
+int http_server_response_write_head2(http_server_response * res, int status_code, const char * description)
+{
+    char head[1024];
+    int head_len = snprintf(head, sizeof(head), "HTTP/1.1 %d %s\r\n", status_code, description);
+    return http_server_client_write(res->client, head, head_len);
 }
 
 int http_server_response_set_header(http_server_response * res, char * name, int namelen, char * value, int valuelen)

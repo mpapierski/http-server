@@ -115,6 +115,18 @@ int on_message_complete(http_server_client * client, void * data)
         r = http_server_response_printf(res, "success=%d\n", result);
         ASSERT(r == HTTP_SERVER_OK);
     }
+    else if (strcmp(url, "/size/") == 0)
+    {
+        char hello[] = "Hello world!";
+        char content_length[16];
+        int size = sprintf(content_length, "%d", (int)sizeof(hello));
+        r = http_server_response_write_head(res, 200);
+        ASSERT(r == HTTP_SERVER_OK);
+        r = http_server_response_set_header(res, "Content-length", 14, content_length, size);
+        ASSERT(r == HTTP_SERVER_OK);
+        r = http_server_response_write(res, hello, 12);
+        ASSERT(r == HTTP_SERVER_OK);
+    }
     else
     {
         r = http_server_response_write_head(res, 404);

@@ -5,6 +5,7 @@
 #include <assert.h>
 #include <ctype.h>
 #include <stdarg.h>
+#include "miniz.c"
 
 static int http_server_header_cmp(struct http_server_header * lhs, struct http_server_header * rhs)
 {
@@ -39,7 +40,8 @@ http_server_response * http_server_response_new(struct http_server_client * clie
     }
     res->client = NULL;
     res->is_done = 0;
-    res->encoding = HTTP_SERVER_ENCODING_NONE;
+    res->encoding_type = HTTP_SERVER_ENCODING_NONE;
+    res->enc.zlib_stream = NULL;
     // Prepare header for case insensitive comparision
     struct http_server_header hdr_accept_encoding;
     http_server_string_init(&hdr_accept_encoding.field);
@@ -49,6 +51,7 @@ http_server_response * http_server_response_new(struct http_server_client * clie
     }
     // Check for Accept-Encoding header
     struct http_server_header * hdr;
+    char * content_encoding = NULL;
     TAILQ_FOREACH(hdr, &client->headers, headers)
     {
         if (http_server_header_cmp(&hdr_accept_encoding, hdr) == 0)
@@ -64,15 +67,27 @@ http_server_response * http_server_response_new(struct http_server_client * clie
                 fprintf(stderr, "word:[%s]\n", word);
                 if (strcmp(word, "gzip") == 0)
                 {
-                    res->encoding = HTTP_SERVER_ENCODING_GZIP;
+                    res->encoding_type = HTTP_SERVER_ENCODING_GZIP;
+                    content_encoding = word;
                     break;
                 }
                 else if (strcmp(word, "deflate") == 0)
                 {
-                    res->encoding = HTTP_SERVER_ENCODING_DEFLATE;
+                    res->encoding_type = HTTP_SERVER_ENCODING_DEFLATE;
+                    content_encoding = word;
                     break;
                 }
+
             }
+        }
+    }
+    if (content_encoding)
+    {
+        fprintf(stderr, "set content encoding [%s]\n", content_encoding);
+        r = http_server_response_set_header(res, "Content-Encoding", 16, content_encoding, strlen(content_encoding));
+        if (r != HTTP_SERVER_OK)
+        {
+            return NULL;
         }
     }
     return res;
@@ -91,7 +106,14 @@ void http_server_response_free(http_server_response * res)
         TAILQ_REMOVE(&res->headers, header, headers);
         http_server_header_free(header);
     }
+    if (res->encoding_type == HTTP_SERVER_ENCODING_DEFLATE
+        || res->encoding_type == HTTP_SERVER_ENCODING_GZIP)
+    {
+        deflateEnd(res->enc.zlib_stream);
+        free(res->enc.zlib_stream);
+    }
     free(res);
+
 }
 
 int http_server_response_begin(http_server_client * client, http_server_response * res)
@@ -165,13 +187,12 @@ int http_server_response_set_header(http_server_response * res, char * name, int
     {
         return r;
     }
-    
     // Check if user tries to set Content-length header, so we
     // have to disable chunked encoding.
     if (http_server_header_cmp(&hdr_contentlength, hdr) == 0)
     {
+        fprintf(stderr, "remove transfer encoding\n");
         // Remove Transfer-encoding if user sets content-length
-
         while (!TAILQ_EMPTY(&res->headers))
         {
             struct http_server_header * header = TAILQ_FIRST(&res->headers);
@@ -179,6 +200,7 @@ int http_server_response_set_header(http_server_response * res, char * name, int
             {
                 TAILQ_REMOVE(&res->headers, header, headers);
                 http_server_header_free(header);
+                break;
             }
         }
         res->is_chunked = 0;
@@ -192,6 +214,71 @@ int http_server_response_set_header(http_server_response * res, char * name, int
 
     TAILQ_INSERT_TAIL(&res->headers, hdr, headers);
     return HTTP_SERVER_OK;
+}
+
+#define my_max(a,b) (((a) > (b)) ? (a) : (b))
+#define my_min(a,b) (((a) < (b)) ? (a) : (b))
+
+static int http_server__response_transform_zlib(http_server_response * res, char * data, int size)
+{
+    #define CHUNK 0x4000
+    #define windowBits 15
+#define GZIP_ENCODING 16
+    int r;
+    char out[CHUNK];
+    fprintf(stderr, "transform zlib(%.*s)\n", size, data);
+    mz_stream * stream = res->enc.zlib_stream;
+    if (!stream)
+    {
+        res->enc.zlib_stream = calloc(1, sizeof(mz_stream));
+        stream = res->enc.zlib_stream;
+        if ((r = deflateInit(stream, MZ_BEST_COMPRESSION)) < 0)
+        //if ((r = deflateInit2 (stream, Z_DEFAULT_COMPRESSION, Z_DEFLATED,
+        //                     windowBits | GZIP_ENCODING, 8,
+        //                     Z_DEFAULT_STRATEGY)) < 0)
+        {
+            fprintf(stderr, "deflate init error: %d\n", r);
+            abort();
+        }
+    }
+    assert(stream);
+    stream->next_in = (uint8_t *)data;
+    stream->avail_in = size;
+    do {
+        int have;
+        stream->avail_out = CHUNK;
+        stream->next_out = (uint8_t *)out;
+        int r;
+        if ((r = deflate(stream, Z_FINISH)) < 0)
+        {
+            fprintf(stderr, "deflate error: %d\n", r);
+            abort();
+        }
+        have = CHUNK - stream->avail_out;
+        fprintf(stderr, "compressed chunk size: %d\n", have);
+        r = http_server_client_write(res->client, out, have);
+        if (r != HTTP_SERVER_OK)
+        {
+            return r;
+        }
+        //fwrite (out, sizeof (char), have, stdout);
+    } while(stream->avail_out == 0);
+    return HTTP_SERVER_OK;
+}
+
+static int http_server__response_transform(http_server_response * res, char * data, int size)
+{
+    // Transform write buffer according to negotiated encoding type
+    switch (res->encoding_type)
+    {
+    case HTTP_SERVER_ENCODING_NONE:
+        return http_server_client_write(res->client, data, size);
+    case HTTP_SERVER_ENCODING_DEFLATE:
+    case HTTP_SERVER_ENCODING_GZIP:
+        return http_server__response_transform_zlib(res, data, size);
+    default:
+        return HTTP_SERVER_INVALID_PARAM;
+    }
 }
 
 int http_server_response_write(http_server_response * res, char * data, int size)
@@ -232,7 +319,7 @@ int http_server_response_write(http_server_response * res, char * data, int size
             return HTTP_SERVER_NO_MEMORY;
         }
         assert(res->client);
-        int r = http_server_client_write(res->client, frame, frame_length);
+        int r = http_server__response_transform(res, frame, frame_length);
         if (r != HTTP_SERVER_OK)
         {
             free(frame);
@@ -248,7 +335,7 @@ int http_server_response_write(http_server_response * res, char * data, int size
             // Do nothing - called once will create empty response.
             return http_server_client_flush(res->client);
         }
-        int r = http_server_client_write(res->client, data, size);
+        int r = http_server__response_transform(res, data, size);
         if (r != HTTP_SERVER_OK)
         {
             return r;

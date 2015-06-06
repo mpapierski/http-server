@@ -214,7 +214,11 @@ typedef struct http_server_response
     TAILQ_HEAD(http_server_headers, http_server_header) headers;
     int is_chunked;
     int is_done; // is response done?
-    http_server_response_encoding encoding;
+    http_server_response_encoding encoding_type;
+    union
+    {
+        void * zlib_stream;
+    } enc;
 } http_server_response;
 
 struct http_server;

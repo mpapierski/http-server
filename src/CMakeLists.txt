@@ -11,6 +11,10 @@ set (HTTP_SERVER_SOURCES
 set (HTTP_SERVER_HEADERS
 	event.h)
 
+# TODO: if (support accept encoding ...)
+# list (APPEND HTTP_SERVER_SOURCES
+# 	miniz.c)
+
 # Check for availability of platform-dependent functions
 include (CheckFunctionExists)
 Check_Function_Exists(select HTTP_SERVER_HAVE_SELECT)

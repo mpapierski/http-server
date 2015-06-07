@@ -8,6 +8,7 @@ http_server_client * client = NULL;
 void test_client__initialize(void)
 {
 	client = http_server_new_client(&server, HTTP_SERVER_INVALID_SOCKET, &handler);
+	client->parser_.method = HTTP_POST;
 }
 
 void test_client__cleanup(void)
@@ -34,6 +35,12 @@ void test_client__getinfo(void)
 	cl_assert_equal_i(r, HTTP_SERVER_OK);
 	cl_assert(url);
 	cl_assert_equal_s(url, "/get/");
+
+	unsigned int status;
+	r = http_server_client_getinfo(client, HTTP_SERVER_CLIENTINFO_METHOD, &status);
+	cl_assert_equal_i(r, HTTP_SERVER_OK);
+	cl_assert_equal_i(status, HTTP_POST);
+
 }
 
 void test_client__write(void)

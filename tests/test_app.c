@@ -48,7 +48,10 @@ int on_message_complete(http_server_client * client, void * data)
     http_server_response * res = http_server_response_new();
     ASSERT(res);
     char * url;
+    int method;
     int r = http_server_client_getinfo(client, HTTP_SERVER_CLIENTINFO_URL, &url);
+    ASSERT(r == HTTP_SERVER_OK);
+    r = http_server_client_getinfo(client, HTTP_SERVER_CLIENTINFO_METHOD, &method);
     ASSERT(r == HTTP_SERVER_OK);
     r = http_server_response_begin(client, res);
     ASSERT(r == HTTP_SERVER_OK);
@@ -71,7 +74,7 @@ int on_message_complete(http_server_client * client, void * data)
     }
     else if (strcmp(url, "/get/") == 0)
     {
-        if (client->parser_.method == HTTP_GET)
+        if (method == HTTP_GET)
         {
             r = http_server_response_write_head(res, 200);
             ASSERT(r == HTTP_SERVER_OK);
@@ -94,7 +97,7 @@ int on_message_complete(http_server_client * client, void * data)
     }
     else if (strcmp(url, "/post/") == 0)
     {
-        if (client->parser_.method == HTTP_POST)
+        if (method == HTTP_POST)
         {
             r = http_server_response_write_head(res, 200);
             ASSERT(r == HTTP_SERVER_OK);

@@ -282,6 +282,14 @@ int http_server_client_getinfo(http_server_client * client, http_server_clientin
         *url = (char *)http_server_string_str(&client->url);
         va_end(ap);
     }
+    else if (code == HTTP_SERVER_CLIENTINFO_METHOD)
+    {
+        va_list ap;
+        va_start(ap, code);
+        unsigned int * code = va_arg(ap, unsigned int *);
+        *code = client->parser_.method;
+        va_end(ap);
+    }
     else
     {
         return HTTP_SERVER_INVALID_PARAM;

@@ -400,12 +400,12 @@ void http_server_client_free(http_server_client * client);
 
 // List of info codes that returns details about client
 #define HTTP_SERVER_ENUM_CLIENT_INFO_CODES(XX) \
-    XX(URL, 0) \
-    XX(METHOD, 1)
+    XX(URL, 0, char *) \
+    XX(METHOD, 1, unsigned int)
 
 typedef enum
 {
-#define XX(name, value) HTTP_SERVER_CLIENTINFO ## _ ## name = value,
+#define XX(name, value, type) HTTP_SERVER_CLIENTINFO ## _ ## name = value,
     HTTP_SERVER_ENUM_CLIENT_INFO_CODES(XX)
 #undef XX
 } http_server_clientinfo;

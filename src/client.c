@@ -268,33 +268,43 @@ int http_server_poll_client(http_server_client * client, int flags)
     return HTTP_SERVER_OK;
 }
 
+static int http_server__getinfo_URL(http_server_client * client, char ** result)
+{
+    *result = (char *)http_server_string_str(&client->url);
+    return HTTP_SERVER_OK;
+}
+
+static int http_server__getinfo_METHOD(http_server_client * client, unsigned int * result)
+{
+    *result = client->parser_.method;
+    return HTTP_SERVER_OK;
+}
+
 int http_server_client_getinfo(http_server_client * client, http_server_clientinfo code, ...)
 {
     if (!client)
     {
         return HTTP_SERVER_INVALID_PARAM;
     }
-    if (code == HTTP_SERVER_CLIENTINFO_URL)
+    va_list ap;
+    va_start(ap, code);
+    void * argument = va_arg(ap, void *);
+    va_end(ap);
+
+    switch (code)
     {
-        va_list ap;
-        va_start(ap, code);
-        char ** url = va_arg(ap, char **);
-        *url = (char *)http_server_string_str(&client->url);
-        va_end(ap);
+#define XX(name, value, type) \
+    case HTTP_SERVER_CLIENTINFO ## _ ## name: \
+    { \
+        int (*getinfo_fn)(http_server_client * client, type *); \
+        getinfo_fn = &http_server__getinfo_ ## name; \
+        return getinfo_fn(client, (type *)argument); \
     }
-    else if (code == HTTP_SERVER_CLIENTINFO_METHOD)
-    {
-        va_list ap;
-        va_start(ap, code);
-        unsigned int * code = va_arg(ap, unsigned int *);
-        *code = client->parser_.method;
-        va_end(ap);
-    }
-    else
-    {
+    HTTP_SERVER_ENUM_CLIENT_INFO_CODES(XX)
+#undef XX
+    default:
         return HTTP_SERVER_INVALID_PARAM;
     }
-    return HTTP_SERVER_OK;
 }
 
 int http_server_client_write(http_server_client * client, char * data, int size)
